@@ -36,10 +36,16 @@ feterminal /path/to/project/.feterminal
 
 `Webdev` mode groups commands into separate categories in the right sidebar:
 
+- Postgres
 - Backend
 - Frontend
 - Workers
 - AI: Codex, Claude Code, Copilot, Gemini
+
+Webdev also has two views:
+
+- `Consoles`: the normal live service terminals
+- `Errors`: the same tree without AI entries, showing grouped error events and filtered error output
 
 Each slot can:
 
@@ -56,6 +62,14 @@ The command editor lives in the collapsible settings panel and includes:
 Workers are dynamic, so you can add more than one worker slot from the UI. Commands are stored in [webdev.json](/var/home/poppolouse/Desktop/code/feterminal/webdev.json).
 
 AI entries use brand icons bundled under [brand-icons](/var/home/poppolouse/Desktop/code/feterminal/assets/brand-icons).
+
+Service output is mirrored into per-service log files under `.feterminal-logs/` inside the active project, which powers the `Errors` view.
+
+The footer shows:
+
+- current git branch
+- current short commit hash
+- the active GitHub account detected from `gh auth status`
 
 ## File association
 
@@ -100,12 +114,30 @@ Project behavior:
 - terminal tabs start in the project directory
 - AI sessions also start in the project directory
 - services can define multiple commands and they run in order
+- Postgres entries can either open a live database console or run explicit log commands
 
 Example `.feterminal`:
 
 ```json
 {
   "name": "My App",
+  "postgres": [
+    {
+      "id": "postgres-main",
+      "name": "App DB",
+      "container": "my-postgres",
+      "database": "app_db",
+      "user": "postgres",
+      "password": "postgres"
+    },
+    {
+      "id": "postgres-logs",
+      "name": "Postgres Logs",
+      "commands": [
+        "podman logs -f my-postgres"
+      ]
+    }
+  ],
   "backend": {
     "commands": [
       "uv sync",

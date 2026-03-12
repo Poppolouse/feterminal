@@ -34,6 +34,14 @@ SERVICE_LOG_DIR_NAME = ".feterminal-logs"
 ERROR_PATTERN = re.compile(r"(error|exception|traceback|fatal|failed)", re.IGNORECASE)
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 SCRIPT_BIN = shutil.which("script") or "/home/linuxbrew/.linuxbrew/bin/script"
+ERROR_EVENT_START_PATTERN = re.compile(
+    r"(unhandled exception|exception in asgi application|traceback \(most recent call last\):|^error[:\s]|^fatal[:\s]|^failed[:\s])",
+    re.IGNORECASE,
+)
+MULTILINE_ERROR_START_PATTERN = re.compile(
+    r"(unhandled exception|exception in asgi application|traceback \(most recent call last\):)",
+    re.IGNORECASE,
+)
 AI_TOOL_NAMES = ["codex", "claude_code", "copilot", "gemini"]
 AI_LABELS = {
     "codex": "Codex",
@@ -923,21 +931,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         return self.service_log_directory() / f"{safe_service_id}.log"
 
     def service_error_count(self, service_id: str) -> int:
-        log_path = self.service_log_path(service_id)
-        if not log_path.exists():
-            return 0
-        try:
-            return sum(
-                1
-                for line in strip_ansi_sequences(
-                    log_path.read_text(encoding="utf-8", errors="ignore").replace("\r", "\n")
-                ).splitlines()
-                if ERROR_PATTERN.search(line)
-            )
-        except OSError:
-            return 0
+        return len(self.service_error_entries(service_id))
 
-    def service_error_lines(self, service_id: str) -> list[str]:
+    def service_error_entries(self, service_id: str) -> list[str]:
         log_path = self.service_log_path(service_id)
         if not log_path.exists():
             return []
@@ -945,9 +941,53 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             text = strip_ansi_sequences(
                 log_path.read_text(encoding="utf-8", errors="ignore").replace("\r", "\n")
             )
-            return [line.strip() for line in text.splitlines() if ERROR_PATTERN.search(line)]
         except OSError:
             return []
+        lines = text.splitlines()
+        entries: list[str] = []
+        current: list[str] = []
+        current_multiline = False
+
+        def flush_current() -> None:
+            nonlocal current, current_multiline
+            if not current:
+                return
+            block = "\n".join(line.rstrip() for line in current).strip()
+            if block:
+                entries.append(block)
+            current = []
+            current_multiline = False
+
+        for line in lines:
+            stripped = line.rstrip()
+            is_event_start = bool(ERROR_EVENT_START_PATTERN.search(stripped))
+            has_error_signal = bool(ERROR_PATTERN.search(stripped))
+            is_multiline_start = bool(MULTILINE_ERROR_START_PATTERN.search(stripped))
+
+            if is_event_start and current:
+                flush_current()
+
+            if is_event_start:
+                current.append(stripped)
+                current_multiline = is_multiline_start
+                if not current_multiline:
+                    flush_current()
+                continue
+
+            if current:
+                if not current_multiline:
+                    flush_current()
+                elif not stripped:
+                    flush_current()
+                else:
+                    current.append(stripped)
+                continue
+
+            if has_error_signal:
+                entries.append(stripped)
+
+        flush_current()
+        return entries
 
     def initial_terminal_banner_script(self) -> str:
         lines = [
@@ -967,7 +1007,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
                 "printf '  \\033[1;37mSettings\\033[0m   Use the Webdev gear button to edit commands\\n'",
                 "printf '  \\033[1;37mProject file\\033[0m .feterminal loads project-specific commands\\n\\n'",
                 "printf '  \\033[38;5;117mGitHub\\033[0m     https://github.com/Poppolouse/feterminal\\n'",
-                "printf '  \\033[38;5;117mRelease\\033[0m    v0.2.0\\n\\n'",
+                "printf '  \\033[38;5;117mRelease\\033[0m    v0.2.2\\n\\n'",
             ]
         )
         return "\n".join(lines) + "\n"
@@ -1537,14 +1577,16 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         page = self.error_pages.get(service_id)
         if not page:
             return
-        lines = self.service_error_lines(service_id)
-        if lines:
-            chunks = [f"{line}\n\n----------------------------------------" for line in lines]
+        entries = self.service_error_entries(service_id)
+        if entries:
+            chunks = [f"{entry}\n\n----------------------------------------" for entry in entries]
             text = "\n\n".join(chunks)
         else:
             text = "No errors captured."
         buffer_ = page["view"].get_buffer()
-        buffer_.set_text(text)
+        current_text = buffer_.get_text(buffer_.get_start_iter(), buffer_.get_end_iter(), True)
+        if current_text != text:
+            buffer_.set_text(text)
 
     def on_service_open_clicked(self, _button, service_id: str, mode: str) -> None:
         if mode == "errors":
@@ -1558,6 +1600,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
     def on_start_service_clicked(self, _button, service_id: str) -> None:
         self.start_service(service_id)
+        if self.webdev_view_mode == "errors":
+            self.select_page(self.ensure_error_page(service_id))
 
     def on_stop_service_clicked(self, _button, service_id: str) -> None:
         self.stop_service(service_id)
