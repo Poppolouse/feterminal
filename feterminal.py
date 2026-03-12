@@ -742,6 +742,24 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def service_working_directory(self, _service_id: str) -> str:
         return self.default_working_directory()
 
+    def initial_terminal_banner(self) -> bytes:
+        lines = [
+            "clear",
+            "printf '\\033[1;35mWelcome to feterminal\\033[0m\\n\\n'",
+        ]
+        if self.project_name:
+            lines.append(
+                f"printf '  Project: \\033[1;37m{self.project_name}\\033[0m\\n'"
+            )
+        lines.extend(
+            [
+                "printf '  Tabs: terminal sessions live in the right sidebar\\n'",
+                "printf '  Webdev: backend, frontend, workers, and AI tools are grouped on the right\\n'",
+                "printf '  Settings: use the gear icon in Webdev to edit commands\\n\\n'",
+            ]
+        )
+        return ("\n".join(lines) + "\n").encode("utf-8")
+
     def make_terminal_page(self, page_name: str) -> Vte.Terminal:
         terminal = Vte.Terminal()
         terminal.set_scrollback_lines(10000)
@@ -765,6 +783,13 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             None,
             None,
         )
+        banner_bytes = self.initial_terminal_banner()
+
+        def print_banner():
+            terminal.feed_child(banner_bytes)
+            return False
+
+        GLib.timeout_add(120, print_banner)
 
     def add_terminal_tab(self) -> None:
         self.tab_counter += 1
