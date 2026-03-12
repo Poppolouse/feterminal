@@ -22,6 +22,7 @@ APP_ID = "io.poppolouse.feterminal"
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = APP_DIR / "shortcuts.json"
 WEBDEV_CONFIG_PATH = APP_DIR / "webdev.json"
+BRAND_ICON_DIR = APP_DIR / "assets" / "brand-icons"
 AI_TOOL_NAMES = ["codex", "claude_code", "copilot", "gemini"]
 AI_LABELS = {
     "codex": "Codex",
@@ -35,6 +36,12 @@ SERVICE_ICONS = {
     "workers": "folder-download-symbolic",
     "ai": "applications-engineering-symbolic",
     "terminal": "utilities-terminal-symbolic",
+}
+AI_ICON_FILES = {
+    "codex": BRAND_ICON_DIR / "openai.svg",
+    "claude_code": BRAND_ICON_DIR / "claude.svg",
+    "copilot": BRAND_ICON_DIR / "copilot.svg",
+    "gemini": BRAND_ICON_DIR / "gemini.svg",
 }
 ACTION_ORDER = [
     "copy",
@@ -177,6 +184,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.service_sessions = {}
         self.service_rows = {}
         self.service_row_boxes = {}
+        self.category_revealers = {}
+        self.category_arrow_images = {}
 
         self.status_label = Gtk.Label(
             label="Ready",
@@ -193,6 +202,11 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         new_tab_button.set_tooltip_text("New terminal tab")
         new_tab_button.connect("clicked", self.on_add_terminal_tab_clicked)
         header.pack_start(new_tab_button)
+
+        sidebar_button = Gtk.Button(label="Sidebar")
+        sidebar_button.add_css_class("flat")
+        sidebar_button.connect("clicked", self.on_toggle_sidebar_clicked)
+        header.pack_end(sidebar_button)
 
         menu_button = Gtk.MenuButton(icon_name="open-menu-symbolic")
         menu_button.set_menu_model(self.build_menu_model())
@@ -216,11 +230,19 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         center_box.append(self.settings_revealer)
 
         sidebar = self.build_sidebar()
+        self.sidebar_revealer = Gtk.Revealer(
+            transition_type=Gtk.RevealerTransitionType.SLIDE_LEFT
+        )
+        self.sidebar_revealer.set_reveal_child(True)
+        sidebar_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        sidebar_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
+        sidebar_shell.append(sidebar)
+        self.sidebar_revealer.set_child(sidebar_shell)
 
         root_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        center_box.set_hexpand(True)
         root_content.append(center_box)
-        root_content.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
-        root_content.append(sidebar)
+        root_content.append(self.sidebar_revealer)
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(header)
@@ -300,10 +322,10 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_revealer.set_reveal_child(True)
         self.webdev_tree_box = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
-            spacing=8,
+            spacing=4,
             margin_top=4,
             margin_bottom=4,
-            margin_start=8,
+            margin_start=0,
             margin_end=0,
         )
         self.webdev_revealer.set_child(self.webdev_tree_box)
@@ -574,15 +596,19 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.clear_box(self.webdev_tree_box)
         self.service_rows = {}
         self.service_row_boxes = {}
+        self.category_revealers = {}
+        self.category_arrow_images = {}
 
         self.webdev_tree_box.append(
-            self.build_category_expander(
+            self.build_category_section(
+                "backend",
                 "Backend",
                 [("backend", "Backend", "backend")],
             )
         )
         self.webdev_tree_box.append(
-            self.build_category_expander(
+            self.build_category_section(
+                "frontend",
                 "Frontend",
                 [("frontend", "Frontend", "frontend")],
             )
@@ -591,39 +617,71 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             (worker["id"], worker["name"], "workers")
             for worker in self.webdev_config["workers"]
         ]
-        self.webdev_tree_box.append(self.build_category_expander("Workers", worker_items))
+        self.webdev_tree_box.append(
+            self.build_category_section("workers", "Workers", worker_items)
+        )
         ai_items = [
             (f"ai:{tool_name}", AI_LABELS[tool_name], "ai")
             for tool_name in AI_TOOL_NAMES
         ]
-        self.webdev_tree_box.append(self.build_category_expander("AI", ai_items))
+        self.webdev_tree_box.append(self.build_category_section("ai", "AI", ai_items))
 
-    def build_category_expander(self, title: str, items: list) -> Gtk.Expander:
-        expander = Gtk.Expander(label=title)
-        expander.set_expanded(True)
+    def build_category_section(self, category_id: str, title: str, items: list) -> Gtk.Box:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        header_button = Gtk.Button()
+        header_button.add_css_class("flat")
+        header_button.set_halign(Gtk.Align.FILL)
+        header_button.connect("clicked", self.on_toggle_category_clicked, category_id)
+        header_row = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            spacing=6,
+            margin_top=4,
+            margin_bottom=4,
+            margin_start=2,
+            margin_end=2,
+        )
+        arrow = Gtk.Image.new_from_icon_name("pan-down-symbolic")
+        self.category_arrow_images[category_id] = arrow
+        header_row.append(arrow)
+        label = Gtk.Label(label=title, xalign=0)
+        label.add_css_class("heading")
+        header_row.append(label)
+        header_row.append(Gtk.Box(hexpand=True))
+        header_button.set_child(header_row)
+        box.append(header_button)
+
         content = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
             spacing=4,
-            margin_top=4,
+            margin_top=0,
             margin_bottom=4,
-            margin_start=8,
+            margin_start=12,
             margin_end=0,
         )
         for service_id, label, icon_group in items:
             row = self.build_service_row(service_id, label, SERVICE_ICONS[icon_group])
             content.append(row)
-        expander.set_child(content)
-        return expander
+        revealer = Gtk.Revealer(
+            transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN
+        )
+        revealer.set_reveal_child(True)
+        revealer.set_child(content)
+        self.category_revealers[category_id] = revealer
+        box.append(revealer)
+        return box
 
     def build_service_row(self, service_id: str, label_text: str, icon_name: str) -> Gtk.Box:
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         row.set_margin_top(2)
         row.set_margin_bottom(2)
+        row.set_hexpand(True)
 
         open_button = Gtk.Button()
         open_button.add_css_class("flat")
+        open_button.set_hexpand(True)
         content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        content.append(Gtk.Image.new_from_icon_name(icon_name))
+        content.set_hexpand(True)
+        content.append(self.make_service_icon(service_id, icon_name))
         title = Gtk.Label(label=label_text, xalign=0)
         title.set_hexpand(True)
         content.append(title)
@@ -656,6 +714,16 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.service_row_boxes[service_id] = row
         self.update_service_row(service_id)
         return row
+
+    def make_service_icon(self, service_id: str, fallback_icon_name: str):
+        if service_id.startswith("ai:"):
+            icon_path = AI_ICON_FILES[service_id.split(":", 1)[1]]
+            if icon_path.exists():
+                picture = Gtk.Picture.new_for_filename(str(icon_path))
+                picture.set_size_request(16, 16)
+                picture.set_can_shrink(True)
+                return picture
+        return Gtk.Image.new_from_icon_name(fallback_icon_name)
 
     def service_config_by_id(self, service_id: str) -> dict:
         if service_id == "backend":
@@ -828,6 +896,17 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
     def on_webdev_toggle_clicked(self, *_args) -> None:
         self.webdev_revealer.set_reveal_child(not self.webdev_revealer.get_reveal_child())
+
+    def on_toggle_sidebar_clicked(self, *_args) -> None:
+        self.sidebar_revealer.set_reveal_child(not self.sidebar_revealer.get_reveal_child())
+
+    def on_toggle_category_clicked(self, _button, category_id: str) -> None:
+        revealer = self.category_revealers[category_id]
+        expanded = not revealer.get_reveal_child()
+        revealer.set_reveal_child(expanded)
+        self.category_arrow_images[category_id].set_from_icon_name(
+            "pan-down-symbolic" if expanded else "pan-end-symbolic"
+        )
 
     def on_toggle_settings_clicked(self, *_args) -> None:
         reveal = not self.settings_revealer.get_reveal_child()

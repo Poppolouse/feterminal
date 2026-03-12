@@ -21,6 +21,7 @@ python3 /var/home/poppolouse/feterminal/feterminal.py
 - Terminal tabs live in the right sidebar instead of the top edge.
 - You can open multiple terminal tabs.
 - The same sidebar includes an expandable `Webdev` tree.
+- The entire right sidebar can be hidden and shown from the header.
 - Clicking `Webdev` does not replace the main terminal area.
 - The command editor opens only from the gear button next to `Webdev`.
 
@@ -46,6 +47,8 @@ The command editor lives in the collapsible settings panel and includes:
 - dynamic worker management
 
 Workers are dynamic, so you can add more than one worker slot from the UI. Commands are stored in [webdev.json](/var/home/poppolouse/feterminal/webdev.json).
+
+AI entries use brand icons bundled under [brand-icons](/var/home/poppolouse/feterminal/assets/brand-icons).
 
 ## Default shortcuts
 
