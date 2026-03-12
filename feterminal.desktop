@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=feterminal
 Comment=Lightweight GTK terminal with editable shortcuts
-Exec=python3 /var/home/poppolouse/feterminal/feterminal.py
+Exec=/var/home/poppolouse/.local/bin/feterminal
 Icon=utilities-terminal
 Terminal=false
 Type=Application
