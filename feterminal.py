@@ -3,8 +3,10 @@
 import json
 import os
 import re
+import shutil
 import shlex
 import signal
+import subprocess
 import sys
 import tempfile
 from copy import deepcopy
@@ -31,6 +33,7 @@ SETTINGS_PANEL_WIDTH = 420
 SERVICE_LOG_DIR_NAME = ".feterminal-logs"
 ERROR_PATTERN = re.compile(r"(error|exception|traceback|fatal|failed)", re.IGNORECASE)
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+SCRIPT_BIN = shutil.which("script") or "/home/linuxbrew/.linuxbrew/bin/script"
 AI_TOOL_NAMES = ["codex", "claude_code", "copilot", "gemini"]
 AI_LABELS = {
     "codex": "Codex",
@@ -125,8 +128,8 @@ def deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-def child_setup_new_session():
-    os.setsid()
+def child_setup_new_session(*_args):
+    return None
 
 
 def normalize_command_list(value) -> list[str]:
@@ -333,6 +336,15 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             margin_end=12,
         )
         self.status_label.add_css_class("dim-label")
+        self.git_status_label = Gtk.Label(
+            label="",
+            xalign=1,
+            margin_top=6,
+            margin_bottom=6,
+            margin_start=12,
+            margin_end=12,
+        )
+        self.git_status_label.add_css_class("dim-label")
 
         header = Adw.HeaderBar()
         new_tab_button = Gtk.Button(icon_name="tab-new-symbolic")
@@ -400,7 +412,11 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         outer_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         outer_box.append(root_content)
         outer_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
-        outer_box.append(self.status_label)
+        status_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        status_bar.append(self.status_label)
+        status_bar.append(Gtk.Box(hexpand=True))
+        status_bar.append(self.git_status_label)
+        outer_box.append(status_bar)
         toolbar_view.set_content(outer_box)
         self.set_content(toolbar_view)
 
@@ -415,6 +431,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.load_webdev_config()
         self.load_project_config()
         self.apply_project_metadata()
+        self.refresh_git_status()
         self.rebuild_settings_panel()
         self.rebuild_webdev_sidebar()
         self.add_terminal_tab()
@@ -445,12 +462,14 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         )
 
     def build_sidebar(self) -> Gtk.Box:
-        sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         sidebar.set_size_request(SIDEBAR_WIDTH, -1)
-        sidebar.set_margin_top(10)
-        sidebar.set_margin_bottom(10)
-        sidebar.set_margin_start(8)
-        sidebar.set_margin_end(8)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content.set_margin_top(10)
+        content.set_margin_bottom(10)
+        content.set_margin_start(8)
+        content.set_margin_end(8)
 
         terminals_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         terminals_label = Gtk.Label(label="Terminals", xalign=0)
@@ -461,13 +480,13 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         terminals_header.append(terminals_label)
         terminals_header.append(Gtk.Box(hexpand=True))
         terminals_header.append(add_button)
-        sidebar.append(terminals_header)
+        content.append(terminals_header)
 
         self.terminal_listbox = Gtk.ListBox()
         self.terminal_listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self.terminal_listbox.add_css_class("boxed-list")
         self.terminal_listbox.connect("row-selected", self.on_terminal_row_selected)
-        sidebar.append(self.terminal_listbox)
+        content.append(self.terminal_listbox)
 
         webdev_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         webdev_toggle = Gtk.Button(label="Webdev")
@@ -480,8 +499,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         webdev_settings_button.set_tooltip_text("Open Webdev command settings")
         webdev_settings_button.connect("clicked", self.on_toggle_settings_clicked)
         webdev_header.append(webdev_settings_button)
-        sidebar.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
-        sidebar.append(webdev_header)
+        content.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        content.append(webdev_header)
 
         webdev_tabs = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.webdev_consoles_button = Gtk.Button(label="Consoles")
@@ -492,7 +511,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_errors_button.connect("clicked", self.on_webdev_view_mode_clicked, "errors")
         webdev_tabs.append(self.webdev_consoles_button)
         webdev_tabs.append(self.webdev_errors_button)
-        sidebar.append(webdev_tabs)
+        content.append(webdev_tabs)
 
         self.webdev_revealer = Gtk.Revealer(
             transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN
@@ -507,8 +526,16 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             margin_end=0,
         )
         self.webdev_revealer.set_child(self.webdev_tree_box)
-        sidebar.append(self.webdev_revealer)
-        sidebar.append(Gtk.Box(vexpand=True))
+        content.append(self.webdev_revealer)
+        content.append(Gtk.Box(vexpand=True))
+
+        scroller = Gtk.ScrolledWindow(
+            hscrollbar_policy=Gtk.PolicyType.NEVER,
+            vscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
+        )
+        scroller.set_vexpand(True)
+        scroller.set_child(content)
+        sidebar.append(scroller)
         return sidebar
 
     def build_settings_panel(self) -> Gtk.ScrolledWindow:
@@ -846,6 +873,40 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def set_status(self, message: str) -> None:
         self.status_label.set_text(message)
 
+    def run_capture(self, args: list[str], cwd: Path | None = None) -> str | None:
+        try:
+            completed = subprocess.run(
+                args,
+                cwd=str(cwd) if cwd else None,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            return None
+        return completed.stdout.strip()
+
+    def github_account_label(self) -> str:
+        gh_status = self.run_capture(["gh", "auth", "status"], self.project_root)
+        if gh_status:
+            for line in gh_status.splitlines():
+                if "Logged in to github.com account " in line:
+                    return line.split("Logged in to github.com account ", 1)[1].split(" ", 1)[0]
+        git_user = self.run_capture(["git", "config", "--get", "user.name"], self.project_root)
+        if git_user:
+            return git_user
+        return "unknown"
+
+    def refresh_git_status(self) -> None:
+        branch = self.run_capture(["git", "branch", "--show-current"], self.project_root)
+        commit = self.run_capture(["git", "rev-parse", "--short", "HEAD"], self.project_root)
+        if not branch or not commit:
+            self.git_status_label.set_text("")
+            return
+        github_user = self.github_account_label()
+        self.git_status_label.set_text(f"{branch}@{commit}  github:{github_user}")
+
     def default_working_directory(self) -> str:
         return str(self.project_root if self.project_file_path else Path.home())
 
@@ -935,8 +996,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.content_stack.add_named(terminal, page_name)
         return terminal
 
-    def spawn_shell_terminal(self, terminal: Vte.Terminal) -> None:
-        terminal.spawn_async(
+    def spawn_shell_terminal(self, terminal: Vte.Terminal) -> int:
+        _ok, child_pid = terminal.spawn_sync(
             Vte.PtyFlags.DEFAULT,
             self.default_working_directory(),
             self.shell_argv_for_terminal(),
@@ -944,19 +1005,18 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             GLib.SpawnFlags.DEFAULT,
             None,
             None,
-            -1,
-            None,
-            None,
             None,
         )
+        return child_pid
 
     def add_terminal_tab(self) -> None:
         self.tab_counter += 1
         page_name = f"terminal:{self.tab_counter}"
         title = f"Terminal {self.tab_counter}"
         terminal = self.make_terminal_page(page_name)
-        self.spawn_shell_terminal(terminal)
-        self.terminal_tabs[page_name] = {"title": title, "terminal": terminal}
+        terminal.connect("child-exited", self.on_terminal_child_exited, page_name)
+        child_pid = self.spawn_shell_terminal(terminal)
+        self.terminal_tabs[page_name] = {"title": title, "terminal": terminal, "child_pid": child_pid}
         self.add_terminal_row(page_name, title)
         self.select_page(page_name)
 
@@ -1189,10 +1249,11 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def wrapped_commands_script(self, service_id: str) -> str:
         log_path = shlex.quote(str(self.service_log_path(service_id)))
         commands = self.commands_script(service_id)
+        bash_command = shlex.quote(f"bash -lc {shlex.quote(commands)}")
         return (
             f"mkdir -p {shlex.quote(str(self.service_log_directory()))}\n"
             f": > {log_path}\n"
-            f"exec script -qef -c {shlex.quote(commands)} {log_path}"
+            f"exec {shlex.quote(SCRIPT_BIN)} -qef -c {bash_command} {log_path}"
         )
 
     def action_copy(self, *_args) -> None:
@@ -1289,10 +1350,16 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.add_terminal_tab()
         self.set_status("Opened a new terminal tab")
 
-    def on_close_terminal_clicked(self, _button, page_name: str) -> None:
+    def close_terminal_tab(self, page_name: str, *, terminate_process: bool = True) -> None:
         if page_name not in self.terminal_tabs:
             return
-        terminal = self.terminal_tabs[page_name]["terminal"]
+        tab = self.terminal_tabs[page_name]
+        if terminate_process:
+            try:
+                os.kill(tab["child_pid"], signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        terminal = tab["terminal"]
         self.content_stack.remove(terminal)
         del self.terminal_tabs[page_name]
         for row in list(self.iter_listbox_rows(self.terminal_listbox)):
@@ -1302,7 +1369,16 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         next_page = next(iter(self.terminal_tabs), None)
         if next_page:
             self.select_page(next_page)
+
+    def on_close_terminal_clicked(self, _button, page_name: str) -> None:
+        self.close_terminal_tab(page_name)
         self.set_status("Closed terminal tab")
+
+    def on_terminal_child_exited(self, _terminal, _status, page_name: str) -> None:
+        if page_name not in self.terminal_tabs:
+            return
+        self.close_terminal_tab(page_name, terminate_process=False)
+        self.set_status("Terminal tab exited")
 
     def on_terminal_row_selected(self, _listbox, row) -> None:
         if row is None:
@@ -1373,10 +1449,12 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             return
 
         session = self.service_sessions.get(service_id)
-        if session and session["child_pid"] > 0:
-            self.select_page(self.service_page_name(service_id))
-            self.set_status(f"{self.service_label(service_id)} is already running")
-            return
+        if session:
+            if session["running"]:
+                self.select_page(self.service_page_name(service_id))
+                self.set_status(f"{self.service_label(service_id)} is already running")
+                return
+            self.remove_service_page(service_id)
 
         page_name = self.service_page_name(service_id)
         terminal = self.make_terminal_page(page_name)
@@ -1387,7 +1465,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             ["/bin/bash", "-lc", self.wrapped_commands_script(service_id)],
             None,
             GLib.SpawnFlags.DEFAULT,
-            child_setup_new_session,
+            None,
             None,
             None,
         )
@@ -1395,6 +1473,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             "terminal": terminal,
             "child_pid": child_pid,
             "page_name": page_name,
+            "running": True,
         }
         self.select_page(page_name)
         self.update_service_row(service_id)
@@ -1406,8 +1485,13 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             self.update_service_row(service_id)
             self.set_status(f"{self.service_label(service_id)} is not running")
             return
+        if not session["running"]:
+            self.remove_service_page(service_id)
+            self.update_service_row(service_id)
+            self.set_status(f"Closed {self.service_label(service_id)}")
+            return
         try:
-            os.killpg(session["child_pid"], signal.SIGTERM)
+            os.kill(session["child_pid"], signal.SIGTERM)
         except ProcessLookupError:
             pass
         self.set_status(f"Stopping {self.service_label(service_id)}")
@@ -1423,10 +1507,14 @@ class FeTerminalWindow(Adw.ApplicationWindow):
                 self.select_page(fallback)
 
     def on_service_child_exited(self, _terminal, _status, service_id: str) -> None:
-        self.remove_service_page(service_id)
+        session = self.service_sessions.get(service_id)
+        if session is None:
+            return
+        session["running"] = False
+        session["child_pid"] = 0
         self.update_service_row(service_id)
         self.refresh_error_page(service_id)
-        self.set_status(f"{self.service_label(service_id)} stopped")
+        self.set_status(f"{self.service_label(service_id)} exited. Press stop to close the terminal.")
 
     def ensure_error_page(self, service_id: str) -> str:
         existing = self.error_pages.get(service_id)
@@ -1502,14 +1590,14 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         if row is None:
             return
         session = self.service_sessions.get(service_id)
-        running = session is not None
+        running = bool(session and session["running"])
         if row["mode"] == "errors":
             error_count = self.service_error_count(service_id)
             row["status"].set_text(f"{error_count} errors")
         else:
-            row["status"].set_text("running" if running else "idle")
+            row["status"].set_text("running" if running else "stopped")
         row["start_button"].set_sensitive(not running)
-        row["stop_button"].set_sensitive(running)
+        row["stop_button"].set_sensitive(session is not None)
 
     def refresh_service_statuses(self) -> bool:
         for service_id in list(self.service_rows):
@@ -1521,6 +1609,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def on_close_request(self, *_args):
         for service_id in list(self.service_sessions):
             self.stop_service(service_id)
+        for page_name in list(self.terminal_tabs):
+            self.close_terminal_tab(page_name)
         for path in self.bootstrap_files:
             try:
                 path.unlink(missing_ok=True)
