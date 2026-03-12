@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shlex
 import signal
 import sys
@@ -27,6 +28,8 @@ WEBDEV_CONFIG_PATH = APP_DIR / "webdev.json"
 BRAND_ICON_DIR = APP_DIR / "assets" / "brand-icons"
 SIDEBAR_WIDTH = 320
 SETTINGS_PANEL_WIDTH = 420
+SERVICE_LOG_DIR_NAME = ".feterminal-logs"
+ERROR_PATTERN = re.compile(r"(error|exception|traceback|fatal|failed)", re.IGNORECASE)
 AI_TOOL_NAMES = ["codex", "claude_code", "copilot", "gemini"]
 AI_LABELS = {
     "codex": "Codex",
@@ -35,6 +38,7 @@ AI_LABELS = {
     "gemini": "Gemini",
 }
 SERVICE_ICONS = {
+    "postgres": "database-symbolic",
     "backend": "network-server-symbolic",
     "frontend": "applications-web-browser-symbolic",
     "workers": "system-run-symbolic",
@@ -69,6 +73,9 @@ ACTION_LABELS = {
     "open_preferences": "Open Preferences",
     "close_window": "Close Window",
 }
+DEFAULT_POSTGRES_CONTAINER = "factory-planner-postgres"
+DEFAULT_POSTGRES_HOST = "127.0.0.1"
+DEFAULT_POSTGRES_PORT = 5432
 DEFAULT_SHORTCUTS = {
     "copy": ["<Ctrl>c"],
     "paste": ["<Ctrl>v"],
@@ -81,6 +88,7 @@ DEFAULT_SHORTCUTS = {
     "close_window": ["<Ctrl><Shift>q"],
 }
 DEFAULT_WEBDEV_CONFIG = {
+    "postgres": [],
     "backend": {"commands": []},
     "frontend": {"commands": []},
     "workers": [{"id": "worker-1", "name": "Worker 1", "commands": []}],
@@ -93,6 +101,7 @@ DEFAULT_WEBDEV_CONFIG = {
 }
 DEFAULT_PROJECT_CONFIG = {
     "name": "",
+    "postgres": [],
     "backend": {"commands": []},
     "frontend": {"commands": []},
     "workers": [],
@@ -136,7 +145,57 @@ def normalize_service_config(value) -> dict:
     return {"commands": commands}
 
 
-def resolve_project_file(cli_target: str | None) -> Path | None:
+def build_postgres_commands(config: dict) -> list[str]:
+    database = str(config.get("database", "")).strip()
+    if not database:
+        return normalize_service_config(config)["commands"]
+    container = str(config.get("container", DEFAULT_POSTGRES_CONTAINER)).strip() or DEFAULT_POSTGRES_CONTAINER
+    user = str(config.get("user", "postgres")).strip() or "postgres"
+    password = str(config.get("password", "")).strip()
+    command = [
+        "./scripts/open-postgres-console.sh",
+        "--container",
+        shlex.quote(container),
+        "--user",
+        shlex.quote(user),
+        "--database",
+        shlex.quote(database),
+    ]
+    if password:
+        command.extend(["--password", shlex.quote(password)])
+    return [" ".join(command)]
+
+
+def normalize_postgres_entries(value) -> list[dict]:
+    raw_entries = value if isinstance(value, list) else [value] if isinstance(value, dict) else []
+    entries = []
+    for index, entry in enumerate(raw_entries, start=1):
+        if not isinstance(entry, dict):
+            continue
+        database = str(entry.get("database", "")).strip()
+        generated_name = database or f"Database {index}"
+        commands = normalize_service_config(entry)["commands"]
+        if not commands and database:
+            commands = build_postgres_commands(entry)
+        entries.append(
+            {
+                "id": str(entry.get("id", f"postgres-{index}")).strip() or f"postgres-{index}",
+                "name": str(entry.get("name", generated_name)).strip() or generated_name,
+                "database": database,
+                "container": str(entry.get("container", DEFAULT_POSTGRES_CONTAINER)).strip() or DEFAULT_POSTGRES_CONTAINER,
+                "user": str(entry.get("user", "postgres")).strip() or "postgres",
+                "password": str(entry.get("password", "")).strip(),
+                "host": str(entry.get("host", DEFAULT_POSTGRES_HOST)).strip() or DEFAULT_POSTGRES_HOST,
+                "port": int(entry.get("port", DEFAULT_POSTGRES_PORT)),
+                "commands": commands,
+            }
+        )
+    return entries
+
+
+def resolve_project_file(
+    cli_target: str | None, launch_cwd: str | os.PathLike[str] | None = None
+) -> Path | None:
     if cli_target:
         target = Path(cli_target).expanduser().resolve()
         if target.is_file():
@@ -146,7 +205,7 @@ def resolve_project_file(cli_target: str | None) -> Path | None:
         else:
             start_dir = target
     else:
-        start_dir = Path.cwd().resolve()
+        start_dir = Path(launch_cwd).expanduser().resolve() if launch_cwd else Path.cwd().resolve()
 
     current = start_dir
     while True:
@@ -222,14 +281,20 @@ class ShortcutPreferencesWindow(Adw.PreferencesWindow):
 
 
 class FeTerminalWindow(Adw.ApplicationWindow):
-    def __init__(self, app: Adw.Application, cli_target: str | None):
+    def __init__(
+        self,
+        app: Adw.Application,
+        cli_target: str | None,
+        launch_cwd: str | os.PathLike[str] | None = None,
+    ):
         super().__init__(application=app, title="feterminal")
         self.set_default_size(1360, 820)
         self.install_css()
 
-        self.project_file_path = resolve_project_file(cli_target)
+        launch_root = Path(launch_cwd).expanduser().resolve() if launch_cwd else Path.cwd().resolve()
+        self.project_file_path = resolve_project_file(cli_target, launch_root)
         self.project_root = (
-            self.project_file_path.parent if self.project_file_path else Path.home()
+            self.project_file_path.parent if self.project_file_path else launch_root
         )
         self.project_name = ""
         self.project_config = deepcopy(DEFAULT_PROJECT_CONFIG)
@@ -240,12 +305,14 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.default_mod_mask = Gtk.accelerator_get_default_mod_mask()
         self.preferences_window = None
         self.settings_row_inputs = {}
+        self.webdev_view_mode = "consoles"
 
         self.tab_counter = 0
         self.active_page_name = None
         self.terminal_tabs = {}
         self.service_sessions = {}
         self.service_rows = {}
+        self.error_pages = {}
         self.category_revealers = {}
         self.category_arrow_images = {}
         self.sidebar_visible = True
@@ -411,6 +478,17 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         sidebar.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
         sidebar.append(webdev_header)
 
+        webdev_tabs = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.webdev_consoles_button = Gtk.Button(label="Consoles")
+        self.webdev_consoles_button.add_css_class("suggested-action")
+        self.webdev_consoles_button.connect("clicked", self.on_webdev_view_mode_clicked, "consoles")
+        self.webdev_errors_button = Gtk.Button(label="Errors")
+        self.webdev_errors_button.add_css_class("flat")
+        self.webdev_errors_button.connect("clicked", self.on_webdev_view_mode_clicked, "errors")
+        webdev_tabs.append(self.webdev_consoles_button)
+        webdev_tabs.append(self.webdev_errors_button)
+        sidebar.append(webdev_tabs)
+
         self.webdev_revealer = Gtk.Revealer(
             transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN
         )
@@ -468,6 +546,12 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         description.add_css_class("dim-label")
         self.settings_container.append(description)
 
+        self.settings_container.append(
+            self.build_settings_group(
+                "Postgres",
+                [(entry["id"], entry["name"]) for entry in self.webdev_config["postgres"]],
+            )
+        )
         self.settings_container.append(
             self.build_settings_group("Backend", [("backend", "Backend")])
         )
@@ -627,6 +711,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.project_config = self.normalize_project_config(raw)
         self.project_name = self.project_config["name"] or self.project_root.name
 
+        self.webdev_config["postgres"] = deepcopy(
+            self.project_config["postgres"] or self.webdev_config["postgres"]
+        )
         self.webdev_config["backend"] = deepcopy(self.project_config["backend"])
         self.webdev_config["frontend"] = deepcopy(self.project_config["frontend"])
         self.webdev_config["workers"] = deepcopy(
@@ -647,6 +734,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def normalize_webdev_config(self, raw: dict) -> dict:
         merged = deep_merge(DEFAULT_WEBDEV_CONFIG, raw if isinstance(raw, dict) else {})
         config = {
+            "postgres": normalize_postgres_entries(merged.get("postgres", [])),
             "backend": normalize_service_config(merged.get("backend", {})),
             "frontend": normalize_service_config(merged.get("frontend", {})),
             "workers": [],
@@ -666,12 +754,27 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             config["ai"][tool_name] = normalize_service_config(
                 merged.get("ai", {}).get(tool_name, {})
             )
+        if not config["postgres"]:
+            config["postgres"] = [
+                {
+                    "id": "postgres-1",
+                    "name": "Postgres",
+                    "database": "",
+                    "container": DEFAULT_POSTGRES_CONTAINER,
+                    "user": "postgres",
+                    "password": "",
+                    "host": DEFAULT_POSTGRES_HOST,
+                    "port": DEFAULT_POSTGRES_PORT,
+                    "commands": [],
+                }
+            ]
         return config
 
     def normalize_project_config(self, raw: dict) -> dict:
         merged = deep_merge(DEFAULT_PROJECT_CONFIG, raw if isinstance(raw, dict) else {})
         config = {
             "name": str(merged.get("name", "")).strip(),
+            "postgres": normalize_postgres_entries(merged.get("postgres", [])),
             "backend": normalize_service_config(merged.get("backend", {})),
             "frontend": normalize_service_config(merged.get("frontend", {})),
             "workers": [],
@@ -702,6 +805,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             return
         payload = {
             "name": self.project_name or self.project_root.name,
+            "postgres": deepcopy(self.webdev_config["postgres"]),
             "backend": deepcopy(self.webdev_config["backend"]),
             "frontend": deepcopy(self.webdev_config["frontend"]),
             "workers": deepcopy(self.webdev_config["workers"]),
@@ -742,6 +846,33 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
     def service_working_directory(self, _service_id: str) -> str:
         return self.default_working_directory()
+
+    def service_log_directory(self) -> Path:
+        log_dir = self.project_root / SERVICE_LOG_DIR_NAME
+        log_dir.mkdir(parents=True, exist_ok=True)
+        return log_dir
+
+    def service_log_path(self, service_id: str) -> Path:
+        safe_service_id = service_id.replace(":", "-").replace("/", "-")
+        return self.service_log_directory() / f"{safe_service_id}.log"
+
+    def service_error_count(self, service_id: str) -> int:
+        log_path = self.service_log_path(service_id)
+        if not log_path.exists():
+            return 0
+        try:
+            return sum(1 for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines() if ERROR_PATTERN.search(line))
+        except OSError:
+            return 0
+
+    def service_error_lines(self, service_id: str) -> list[str]:
+        log_path = self.service_log_path(service_id)
+        if not log_path.exists():
+            return []
+        try:
+            return [line for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines() if ERROR_PATTERN.search(line)]
+        except OSError:
+            return []
 
     def initial_terminal_banner_script(self) -> str:
         lines = [
@@ -840,7 +971,24 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.service_rows = {}
         self.category_revealers = {}
         self.category_arrow_images = {}
+        self.webdev_consoles_button.remove_css_class("suggested-action")
+        self.webdev_consoles_button.remove_css_class("flat")
+        self.webdev_errors_button.remove_css_class("suggested-action")
+        self.webdev_errors_button.remove_css_class("flat")
+        if self.webdev_view_mode == "consoles":
+            self.webdev_consoles_button.add_css_class("suggested-action")
+            self.webdev_errors_button.add_css_class("flat")
+        else:
+            self.webdev_errors_button.add_css_class("suggested-action")
+            self.webdev_consoles_button.add_css_class("flat")
 
+        self.webdev_tree_box.append(
+            self.build_category_section(
+                "postgres",
+                "Postgres",
+                [(entry["id"], entry["name"], "postgres") for entry in self.webdev_config["postgres"]],
+            )
+        )
         self.webdev_tree_box.append(
             self.build_category_section("backend", "Backend", [("backend", "Backend", "backend")])
         )
@@ -854,11 +1002,12 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_tree_box.append(
             self.build_category_section("workers", "Workers", worker_items)
         )
-        ai_items = [
-            (f"ai:{tool_name}", AI_LABELS[tool_name], "ai")
-            for tool_name in AI_TOOL_NAMES
-        ]
-        self.webdev_tree_box.append(self.build_category_section("ai", "AI", ai_items))
+        if self.webdev_view_mode == "consoles":
+            ai_items = [
+                (f"ai:{tool_name}", AI_LABELS[tool_name], "ai")
+                for tool_name in AI_TOOL_NAMES
+            ]
+            self.webdev_tree_box.append(self.build_category_section("ai", "AI", ai_items))
 
     def build_category_section(self, category_id: str, title: str, items: list) -> Gtk.Box:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -894,7 +1043,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             margin_end=0,
         )
         for service_id, label, icon_group in items:
-            content.append(self.build_service_row(service_id, label, SERVICE_ICONS[icon_group]))
+            content.append(self.build_service_row(service_id, label, SERVICE_ICONS[icon_group], self.webdev_view_mode))
         revealer = Gtk.Revealer(
             transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN
         )
@@ -904,7 +1053,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         box.append(revealer)
         return box
 
-    def build_service_row(self, service_id: str, label_text: str, icon_name: str) -> Gtk.Box:
+    def build_service_row(self, service_id: str, label_text: str, icon_name: str, mode: str) -> Gtk.Box:
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         row.set_margin_top(2)
         row.set_margin_bottom(2)
@@ -920,11 +1069,11 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         title = Gtk.Label(label=label_text, xalign=0)
         title.set_hexpand(True)
         content.append(title)
-        status = Gtk.Label(label="idle", xalign=0)
+        status = Gtk.Label(label="0 errors" if mode == "errors" else "idle", xalign=0)
         status.add_css_class("caption")
         content.append(status)
         open_button.set_child(content)
-        open_button.connect("clicked", self.on_service_open_clicked, service_id)
+        open_button.connect("clicked", self.on_service_open_clicked, service_id, mode)
 
         start_button = Gtk.Button(icon_name="media-playback-start-symbolic")
         start_button.add_css_class("flat")
@@ -943,6 +1092,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             "status": status,
             "start_button": start_button,
             "stop_button": stop_button,
+            "mode": mode,
         }
         self.update_service_row(service_id)
         return row
@@ -957,6 +1107,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         return Gtk.Image.new_from_icon_name(fallback_icon_name)
 
     def service_config_by_id(self, service_id: str) -> dict:
+        for postgres_entry in self.webdev_config["postgres"]:
+            if postgres_entry["id"] == service_id:
+                return postgres_entry
         if service_id == "backend":
             return self.webdev_config["backend"]
         if service_id == "frontend":
@@ -969,6 +1122,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         raise KeyError(service_id)
 
     def service_label(self, service_id: str) -> str:
+        for postgres_entry in self.webdev_config["postgres"]:
+            if postgres_entry["id"] == service_id:
+                return postgres_entry["name"]
         if service_id == "backend":
             return "Backend"
         if service_id == "frontend":
@@ -979,6 +1135,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
     def service_page_name(self, service_id: str) -> str:
         return f"service:{service_id}"
+
+    def service_error_page_name(self, service_id: str) -> str:
+        return f"service-errors:{service_id}"
 
     def current_terminal(self):
         if self.active_page_name in self.terminal_tabs:
@@ -1012,6 +1171,18 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
     def commands_script(self, service_id: str) -> str:
         return "\n".join(self.commands_for_service(service_id))
+
+    def wrapped_commands_script(self, service_id: str) -> str:
+        log_path = shlex.quote(str(self.service_log_path(service_id)))
+        commands = self.commands_script(service_id)
+        return (
+            f"mkdir -p {shlex.quote(str(self.service_log_directory()))}\n"
+            f": > {log_path}\n"
+            "set -o pipefail\n"
+            "{\n"
+            f"{commands}\n"
+            f"}} 2>&1 | tee -a {log_path}"
+        )
 
     def action_copy(self, *_args) -> None:
         terminal = self.current_terminal()
@@ -1130,6 +1301,12 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def on_webdev_toggle_clicked(self, *_args) -> None:
         self.webdev_revealer.set_reveal_child(not self.webdev_revealer.get_reveal_child())
 
+    def on_webdev_view_mode_clicked(self, _button, mode: str) -> None:
+        if self.webdev_view_mode == mode:
+            return
+        self.webdev_view_mode = mode
+        self.rebuild_webdev_sidebar()
+
     def on_toggle_sidebar_clicked(self, *_args) -> None:
         self.sidebar_visible = not self.sidebar_visible
         if self.sidebar_visible:
@@ -1196,7 +1373,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         _ok, child_pid = terminal.spawn_sync(
             Vte.PtyFlags.DEFAULT,
             self.service_working_directory(service_id),
-            ["/bin/bash", "-lc", self.commands_script(service_id)],
+            ["/bin/bash", "-lc", self.wrapped_commands_script(service_id)],
             None,
             GLib.SpawnFlags.DEFAULT,
             child_setup_new_session,
@@ -1237,9 +1414,39 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def on_service_child_exited(self, _terminal, _status, service_id: str) -> None:
         self.remove_service_page(service_id)
         self.update_service_row(service_id)
+        self.refresh_error_page(service_id)
         self.set_status(f"{self.service_label(service_id)} stopped")
 
-    def on_service_open_clicked(self, _button, service_id: str) -> None:
+    def ensure_error_page(self, service_id: str) -> str:
+        existing = self.error_pages.get(service_id)
+        if existing:
+            return existing["page_name"]
+        page_name = self.service_error_page_name(service_id)
+        text_view = Gtk.TextView(editable=False, monospace=True, cursor_visible=False, wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        text_view.set_top_margin(8)
+        text_view.set_bottom_margin(8)
+        text_view.set_left_margin(8)
+        text_view.set_right_margin(8)
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_child(text_view)
+        self.content_stack.add_named(scroller, page_name)
+        self.error_pages[service_id] = {"page_name": page_name, "view": text_view, "container": scroller}
+        self.refresh_error_page(service_id)
+        return page_name
+
+    def refresh_error_page(self, service_id: str) -> None:
+        page = self.error_pages.get(service_id)
+        if not page:
+            return
+        lines = self.service_error_lines(service_id)
+        text = "\n".join(lines) if lines else "No errors captured."
+        buffer_ = page["view"].get_buffer()
+        buffer_.set_text(text)
+
+    def on_service_open_clicked(self, _button, service_id: str, mode: str) -> None:
+        if mode == "errors":
+            self.select_page(self.ensure_error_page(service_id))
+            return
         session = self.service_sessions.get(service_id)
         if session is None:
             self.set_status(f"{self.service_label(service_id)} is not running")
@@ -1281,13 +1488,19 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             return
         session = self.service_sessions.get(service_id)
         running = session is not None
-        row["status"].set_text("running" if running else "idle")
+        if row["mode"] == "errors":
+            error_count = self.service_error_count(service_id)
+            row["status"].set_text(f"{error_count} errors")
+        else:
+            row["status"].set_text("running" if running else "idle")
         row["start_button"].set_sensitive(not running)
         row["stop_button"].set_sensitive(running)
 
     def refresh_service_statuses(self) -> bool:
         for service_id in list(self.service_rows):
             self.update_service_row(service_id)
+        for service_id in list(self.error_pages):
+            self.refresh_error_page(service_id)
         return True
 
     def on_close_request(self, *_args):
@@ -1303,20 +1516,43 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
 class FeTerminalApp(Adw.Application):
     def __init__(self, cli_target: str | None):
-        super().__init__(application_id=APP_ID)
+        super().__init__(
+            application_id=APP_ID,
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+        )
         self.window = None
         self.cli_target = cli_target
 
-    def do_activate(self):
-        if self.window is None:
-            self.window = FeTerminalWindow(self, self.cli_target)
+    def open_window(
+        self,
+        cli_target: str | None,
+        launch_cwd: str | os.PathLike[str] | None = None,
+        *,
+        new_window: bool = False,
+    ) -> FeTerminalWindow:
+        self.window = FeTerminalWindow(self, cli_target, launch_cwd)
         self.window.present()
+        return self.window
+
+    def do_activate(self):
+        self.open_window(self.cli_target)
+
+    def do_command_line(self, command_line: Gio.ApplicationCommandLine) -> int:
+        arguments = command_line.get_arguments()
+        cli_target = arguments[1] if len(arguments) > 1 else None
+        launch_cwd = command_line.get_cwd() or None
+
+        if cli_target is None and launch_cwd:
+            cli_target = launch_cwd
+
+        self.open_window(cli_target, launch_cwd, new_window=self.window is not None)
+        return 0
 
 
 def main() -> int:
     cli_target = sys.argv[1] if len(sys.argv) > 1 else None
     app = FeTerminalApp(cli_target)
-    return app.run([sys.argv[0]])
+    return app.run(sys.argv)
 
 
 if __name__ == "__main__":
