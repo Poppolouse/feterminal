@@ -1,76 +1,126 @@
 <svg width="1400" height="900" viewBox="0 0 1400 900" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1400" height="900" rx="24" fill="#101115"/>
+  <rect width="1400" height="900" rx="24" fill="#16171D"/>
   <rect x="2" y="2" width="1396" height="896" rx="22" stroke="#2C3AA7" stroke-width="4"/>
   <rect x="0" y="0" width="1400" height="72" rx="24" fill="#26262D"/>
-  <path d="M0 48H1400V72H0V48Z" fill="#2B2B31"/>
-  <text x="700" y="42" text-anchor="middle" fill="#9A9AA0" font-family="Cantarell, sans-serif" font-size="34" font-weight="700">feterminal</text>
+  <text x="700" y="43" text-anchor="middle" fill="#E6E6EA" font-family="Cantarell, sans-serif" font-size="33" font-weight="700">feterminal</text>
+  <g fill="#8D8E98">
+    <rect x="1188" y="26" width="18" height="4" rx="2"/>
+    <rect x="1188" y="34" width="18" height="4" rx="2"/>
+    <rect x="1188" y="42" width="18" height="4" rx="2"/>
+  </g>
+  <rect x="1222" y="16" width="84" height="40" rx="10" fill="#3B3D44" stroke="#B389D8" stroke-width="2"/>
+  <text x="1264" y="42" text-anchor="middle" fill="#E6E6EA" font-family="Cantarell, sans-serif" font-size="23" font-weight="700">Sidebar</text>
   <g fill="#3A3B45">
-    <circle cx="1224" cy="36" r="18"/>
-    <circle cx="1280" cy="36" r="18"/>
-    <circle cx="1336" cy="36" r="18"/>
+    <circle cx="1328" cy="36" r="18"/>
+    <circle cx="1378" cy="36" r="18"/>
   </g>
   <g fill="#8D8E98">
-    <rect x="1215" y="35" width="18" height="2" rx="1"/>
-    <rect x="1273" y="29" width="14" height="14" rx="1.5" stroke="#8D8E98" stroke-width="2" fill="none"/>
-    <path d="M1328 28L1344 44M1344 28L1328 44" stroke="#8D8E98" stroke-width="2.5" stroke-linecap="round"/>
+    <rect x="1320" y="35" width="16" height="2" rx="1"/>
+    <rect x="1371" y="29" width="14" height="14" rx="1.5" stroke="#8D8E98" stroke-width="2" fill="none"/>
   </g>
-  <g fill="#8D8E98">
-    <rect x="1190" y="26" width="18" height="4" rx="2"/>
-    <rect x="1190" y="34" width="18" height="4" rx="2"/>
-    <rect x="1190" y="42" width="18" height="4" rx="2"/>
-  </g>
+  <circle cx="112" cy="36" r="12" stroke="#E6E6EA" stroke-width="2"/>
+  <path d="M112 30V42M106 36H118" stroke="#E6E6EA" stroke-width="2" stroke-linecap="round"/>
 
-  <rect x="24" y="96" width="1352" height="736" fill="#000000"/>
-
+  <rect x="18" y="72" width="1025" height="790" fill="#000000"/>
   <g font-family="'DejaVu Sans Mono', monospace" font-size="20">
-    <text x="34" y="142" fill="#FF00FF" font-weight="700">Welcome to Bazzite 🎮</text>
-    <text x="34" y="194" fill="#F5F5F5">ⓘ </text>
-    <text x="68" y="194" fill="#FF00FF" font-weight="700">bazzite-gnome:stable</text>
-    <text x="34" y="228" fill="#F5F5F5">🖥 </text>
-    <text x="68" y="228" fill="#FF00FF" font-weight="700">Boot Status: Healthy ☻</text>
-
-    <text x="44" y="282" fill="#BFBFBF">╰▶ Command</text>
-    <text x="458" y="282" fill="#BFBFBF">Description</text>
-    <path d="M36 300H426" stroke="#C2C2C2" stroke-width="1"/>
-    <path d="M438 300H860" stroke="#C2C2C2" stroke-width="1"/>
-    <path d="M442 258V422" stroke="#C2C2C2" stroke-width="1"/>
-
+    <text x="36" y="136" fill="#FF00FF" font-weight="700">Welcome to Bazzite 🎮</text>
+    <text x="36" y="186" fill="#DADADA">◫ </text>
+    <text x="68" y="186" fill="#FF00FF" font-weight="700">bazzite-gnome:stable</text>
+    <text x="36" y="218" fill="#DADADA">◩ </text>
+    <text x="68" y="218" fill="#FF00FF" font-weight="700">Boot Status: Healthy ☻</text>
+    <text x="46" y="274" fill="#BBBBBB">╰▶ Command</text>
+    <text x="398" y="274" fill="#BBBBBB">Description</text>
+    <path d="M38 290H392" stroke="#C6C6C6" stroke-width="1"/>
+    <path d="M405 290H610" stroke="#C6C6C6" stroke-width="1"/>
+    <path d="M390 248V430" stroke="#C6C6C6" stroke-width="1"/>
     <text x="54" y="338" fill="#FF00FF" font-weight="700">ujust --choose</text>
-    <text x="458" y="338" fill="#BDBDBD">List all available commands</text>
-    <text x="54" y="370" fill="#FF00FF" font-weight="700">ujust toggle-user-motd</text>
-    <text x="458" y="370" fill="#BDBDBD">Toggle this banner on/off</text>
-    <text x="54" y="402" fill="#FF00FF" font-weight="700">fastfetch</text>
-    <text x="458" y="402" fill="#BDBDBD">View system information</text>
-    <text x="54" y="434" fill="#FF00FF" font-weight="700">brew help</text>
-    <text x="458" y="434" fill="#BDBDBD">Manage command line packages</text>
-
-    <text x="34" y="488" fill="#C5C5C5">ⓘ It is </text>
-    <text x="126" y="488" fill="#FF00FF" font-weight="700">always</text>
-    <text x="208" y="488" fill="#C5C5C5"> better to install packages with Distrobox rather than layer</text>
-    <text x="34" y="518" fill="#C5C5C5">them with rpm-ostree. </text>
-    <text x="290" y="518" fill="#FF00FF" font-weight="700">ujust distrobox</text>
-    <text x="486" y="518" fill="#C5C5C5"> makes it easy!</text>
-    <text x="34" y="548" fill="#C5C5C5">More info</text>
-    <text x="34" y="578" fill="#FF00FF" text-decoration="underline">https://docs.bazzite.gg/Installing_and_Managing_Software/Distrobox/</text>
-
-    <text x="34" y="632" fill="#C5C5C5">• </text>
-    <text x="58" y="632" fill="#F5F5F5">Report an issue </text>
-    <text x="250" y="632" fill="#FF00FF">https://issues.bazzite.gg/</text>
-    <text x="34" y="664" fill="#C5C5C5">• </text>
-    <text x="58" y="664" fill="#F5F5F5">Documentation </text>
-    <text x="218" y="664" fill="#FF00FF">https://docs.bazzite.gg/</text>
-    <text x="34" y="696" fill="#C5C5C5">• </text>
-    <text x="58" y="696" fill="#F5F5F5">Discord </text>
-    <text x="170" y="696" fill="#FF00FF">https://discord.bazzite.gg/</text>
-    <text x="34" y="728" fill="#C5C5C5">• </text>
-    <text x="58" y="728" fill="#F5F5F5">Bluesky </text>
-    <text x="170" y="728" fill="#FF00FF">https://bluesky.bazzite.gg/</text>
-
-    <text x="10" y="764" fill="#00FF5B" font-weight="700">poppolouse@bazzite</text>
-    <text x="232" y="764" fill="#D4D4D4">:~$</text>
-    <rect x="284" y="742" width="14" height="26" fill="#F5F5F5"/>
+    <text x="402" y="338" fill="#C8C8C8">List all available commands</text>
+    <text x="54" y="372" fill="#FF00FF" font-weight="700">ujust toggle-user-motd</text>
+    <text x="402" y="372" fill="#C8C8C8">Toggle this banner on/off</text>
+    <text x="54" y="406" fill="#FF00FF" font-weight="700">fastfetch</text>
+    <text x="402" y="406" fill="#C8C8C8">View system information</text>
+    <text x="54" y="440" fill="#FF00FF" font-weight="700">brew help</text>
+    <text x="402" y="440" fill="#C8C8C8">Manage command line packages</text>
+    <text x="36" y="510" fill="#D8D8D8">● Report an issue </text>
+    <text x="246" y="510" fill="#FF00FF">https://issues.bazzite.gg/</text>
+    <text x="36" y="544" fill="#D8D8D8">● Documentation </text>
+    <text x="228" y="544" fill="#FF00FF">https://docs.bazzite.gg/</text>
+    <text x="36" y="578" fill="#D8D8D8">● Discord </text>
+    <text x="162" y="578" fill="#FF00FF">https://discord.bazzite.gg/</text>
+    <text x="36" y="612" fill="#D8D8D8">● Bluesky </text>
+    <text x="162" y="612" fill="#FF00FF">https://bluesky.bazzite.gg/</text>
+    <text x="18" y="672" fill="#00FF5B" font-weight="700">poppolouse@bazzite</text>
+    <text x="238" y="672" fill="#DADADA">:~$</text>
+    <rect x="290" y="651" width="14" height="24" fill="#F5F5F5"/>
   </g>
 
-  <rect x="0" y="832" width="1400" height="68" rx="0" fill="#2C2D34"/>
-  <text x="22" y="875" fill="#9A9AA0" font-family="Cantarell, sans-serif" font-size="30">Shortcuts file: /var/home/poppolouse/feterminal/shortcuts.json</text>
+  <rect x="0" y="862" width="1400" height="38" fill="#2B2C34"/>
+  <text x="18" y="887" fill="#9A9AA0" font-family="Cantarell, sans-serif" font-size="24">Ready</text>
+
+  <rect x="1043" y="72" width="357" height="790" fill="#24252C"/>
+  <path d="M1043 72H1400V862H1043" stroke="#34363E"/>
+  <text x="1064" y="104" fill="#F0F0F2" font-family="Cantarell, sans-serif" font-size="27" font-weight="700">Terminals</text>
+  <text x="1348" y="104" fill="#F0F0F2" font-family="Cantarell, sans-serif" font-size="36" font-weight="700">+</text>
+  <rect x="1054" y="126" width="326" height="54" rx="12" fill="#5C4468"/>
+  <rect x="1068" y="144" width="12" height="12" stroke="#F3F3F5" stroke-width="1.5"/>
+  <path d="M1072 149L1076 153" stroke="#F3F3F5" stroke-width="1.5"/>
+  <text x="1090" y="158" fill="#EAEAF0" font-family="Cantarell, sans-serif" font-size="23">Terminal 1</text>
+  <text x="1338" y="158" fill="#EAEAF0" font-family="Cantarell, sans-serif" font-size="28">×</text>
+
+  <path d="M1052 192H1380" stroke="#3A3C45"/>
+  <text x="1064" y="226" fill="#F0F0F2" font-family="Cantarell, sans-serif" font-size="27" font-weight="700">Webdev</text>
+  <text x="1356" y="226" fill="#D0D3DE" font-family="Cantarell, sans-serif" font-size="20">⚙</text>
+
+  <g font-family="Cantarell, sans-serif" fill="#F1F1F4">
+    <text x="1064" y="276" font-size="24">⌄ Backend</text>
+    <text x="1068" y="318" font-size="18">🖥 Backend</text>
+    <text x="1282" y="318" font-size="16" fill="#B8BAC2">idle</text>
+    <text x="1332" y="318" font-size="20">▶</text>
+    <text x="1368" y="318" font-size="18">■</text>
+
+    <text x="1064" y="370" font-size="24">⌄ Frontend</text>
+    <text x="1068" y="412" font-size="18">▣ Frontend</text>
+    <text x="1282" y="412" font-size="16" fill="#B8BAC2">idle</text>
+    <text x="1332" y="412" font-size="20">▶</text>
+    <text x="1368" y="412" font-size="18">■</text>
+
+    <text x="1064" y="464" font-size="24">⌄ Workers</text>
+    <text x="1068" y="506" font-size="18">⚙ Worker 1</text>
+    <text x="1282" y="506" font-size="16" fill="#B8BAC2">idle</text>
+    <text x="1332" y="506" font-size="20">▶</text>
+    <text x="1368" y="506" font-size="18">■</text>
+
+    <text x="1064" y="558" font-size="24">⌄ AI</text>
+  </g>
+
+  <g transform="translate(1066 586)">
+    <path d="M11.217 19.384a3.501 3.501 0 0 0 6.783 -1.217v-5.167l-6 -3.35" stroke="#F5F5F5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M5.214 15.014a3.501 3.501 0 0 0 4.446 5.266l4.34 -2.534v-6.946" stroke="#F5F5F5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M6 7.63c-1.391 -.236 -2.787 .395 -3.534 1.689a3.474 3.474 0 0 0 1.271 4.745l4.263 2.514l6 -3.348" stroke="#F5F5F5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M12.783 4.616a3.501 3.501 0 0 0 -6.783 1.217v5.067l6 3.45" stroke="#F5F5F5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M18.786 8.986a3.501 3.501 0 0 0 -4.446 -5.266l-4.34 2.534v6.946" stroke="#F5F5F5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M18 16.302c1.391 .236 2.787 -.395 3.534 -1.689a3.474 3.474 0 0 0 -1.271 -4.745l-4.308 -2.514l-5.955 3.42" stroke="#F5F5F5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="1096" y="608" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="18">Codex</text>
+  <text x="1282" y="608" fill="#B8BAC2" font-family="Cantarell, sans-serif" font-size="16">idle</text>
+  <text x="1332" y="608" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="20">▶</text>
+  <text x="1368" y="608" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="18">■</text>
+
+  <path d="M1070 651h16.5l-8.25-14z" fill="#F5F5F5"/>
+  <text x="1096" y="652" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="18">Claude Code</text>
+  <text x="1282" y="652" fill="#B8BAC2" font-family="Cantarell, sans-serif" font-size="16">idle</text>
+  <text x="1332" y="652" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="20">▶</text>
+  <text x="1368" y="652" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="18">■</text>
+
+  <path d="M1071 676c2-4 12-4 14 0c2 4 1 10-7 10s-9-6-7-10Z" fill="#F5F5F5"/>
+  <text x="1096" y="696" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="18">Copilot</text>
+  <text x="1282" y="696" fill="#B8BAC2" font-family="Cantarell, sans-serif" font-size="16">idle</text>
+  <text x="1332" y="696" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="20">▶</text>
+  <text x="1368" y="696" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="18">■</text>
+
+  <path d="M1078 719c2 6 6 10 10 12c-4 2-8 6-10 12c-2-6-6-10-10-12c4-2 8-6 10-12Z" fill="#8E75B2"/>
+  <text x="1096" y="740" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="18">Gemini</text>
+  <text x="1282" y="740" fill="#B8BAC2" font-family="Cantarell, sans-serif" font-size="16">idle</text>
+  <text x="1332" y="740" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="20">▶</text>
+  <text x="1368" y="740" fill="#F1F1F4" font-family="Cantarell, sans-serif" font-size="18">■</text>
 </svg>

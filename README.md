@@ -28,6 +28,7 @@ feterminal /path/to/project/.feterminal
 - You can open multiple terminal tabs.
 - The same sidebar includes an expandable `Webdev` tree.
 - The entire right sidebar can be hidden and shown from the header.
+- The sidebar opens and closes with a right-edge slide animation.
 - Clicking `Webdev` does not replace the main terminal area.
 - The command editor opens only from the gear button next to `Webdev`.
 
@@ -55,6 +56,10 @@ The command editor lives in the collapsible settings panel and includes:
 Workers are dynamic, so you can add more than one worker slot from the UI. Commands are stored in [webdev.json](/var/home/poppolouse/feterminal/webdev.json).
 
 AI entries use brand icons bundled under [brand-icons](/var/home/poppolouse/feterminal/assets/brand-icons).
+
+## File association
+
+`feterminal` registers the `.feterminal` extension as `application/x-feterminal-project`, so project files can be opened directly from the desktop environment.
 
 ## Default shortcuts
 
