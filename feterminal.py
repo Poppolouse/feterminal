@@ -1110,7 +1110,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
                 "printf '  \\033[1;37mSettings\\033[0m   Use the Webdev gear button to edit commands\\n'",
                 "printf '  \\033[1;37mProject file\\033[0m .feterminal loads project-specific commands\\n\\n'",
                 "printf '  \\033[38;5;117mGitHub\\033[0m     https://github.com/Poppolouse/feterminal\\n'",
-                "printf '  \\033[38;5;117mRelease\\033[0m    v0.2.2\\n\\n'",
+                "printf '  \\033[38;5;117mRelease\\033[0m    v0.3.0\\n\\n'",
             ]
         )
         return "\n".join(lines) + "\n"
