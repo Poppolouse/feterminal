@@ -25,6 +25,8 @@ PROJECT_FILE_NAME = ".feterminal"
 CONFIG_PATH = APP_DIR / "shortcuts.json"
 WEBDEV_CONFIG_PATH = APP_DIR / "webdev.json"
 BRAND_ICON_DIR = APP_DIR / "assets" / "brand-icons"
+SIDEBAR_WIDTH = 320
+SETTINGS_PANEL_WIDTH = 420
 AI_TOOL_NAMES = ["codex", "claude_code", "copilot", "gemini"]
 AI_LABELS = {
     "codex": "Codex",
@@ -245,6 +247,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.service_rows = {}
         self.category_revealers = {}
         self.category_arrow_images = {}
+        self.panel_animations = {}
 
         self.status_label = Gtk.Label(
             label="Ready",
@@ -285,6 +288,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.settings_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.settings_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         self.settings_shell.append(self.settings_revealer)
+        self.settings_shell.set_size_request(0, -1)
         self.settings_shell.set_visible(False)
 
         center_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
@@ -296,6 +300,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.sidebar_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.sidebar_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         self.sidebar_shell.append(sidebar)
+        self.sidebar_shell.set_size_request(SIDEBAR_WIDTH + 1, -1)
         self.sidebar_shell.set_visible(True)
 
         root_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
@@ -339,7 +344,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
     def build_sidebar(self) -> Gtk.Box:
         sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        sidebar.set_size_request(320, -1)
+        sidebar.set_size_request(SIDEBAR_WIDTH, -1)
         sidebar.set_margin_top(10)
         sidebar.set_margin_bottom(10)
         sidebar.set_margin_start(8)
@@ -402,7 +407,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             margin_start=14,
             margin_end=14,
         )
-        container.set_size_request(420, -1)
+        container.set_size_request(SETTINGS_PANEL_WIDTH, -1)
         self.settings_container = container
 
         scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
@@ -1058,7 +1063,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_revealer.set_reveal_child(not self.webdev_revealer.get_reveal_child())
 
     def on_toggle_sidebar_clicked(self, *_args) -> None:
-        self.sidebar_shell.set_visible(not self.sidebar_shell.get_visible())
+        self.animate_panel(self.sidebar_shell, SIDEBAR_WIDTH + 1, not self.sidebar_shell.get_visible())
 
     def on_toggle_category_clicked(self, _button, category_id: str) -> None:
         revealer = self.category_revealers[category_id]
@@ -1072,7 +1077,35 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         reveal = not self.settings_shell.get_visible()
         self.rebuild_settings_panel()
         self.settings_revealer.set_reveal_child(reveal)
-        self.settings_shell.set_visible(reveal)
+        self.animate_panel(self.settings_shell, SETTINGS_PANEL_WIDTH + 1, reveal)
+
+    def animate_panel(self, widget: Gtk.Widget, expanded_width: int, show: bool) -> None:
+        current_animation = self.panel_animations.get(widget)
+        if current_animation is not None:
+            current_animation.skip()
+
+        start_width = widget.get_width() if widget.get_visible() else 0
+        end_width = expanded_width if show else 0
+
+        if show:
+            widget.set_visible(True)
+
+        def apply_width(value):
+            widget.set_size_request(int(value), -1)
+
+        target = Adw.CallbackAnimationTarget.new(apply_width)
+        animation = Adw.TimedAnimation.new(widget, float(start_width), float(end_width), 180, target)
+
+        def on_state_changed(anim, _pspec):
+            if anim.get_state() == Adw.AnimationState.FINISHED:
+                widget.set_size_request(end_width, -1)
+                if not show:
+                    widget.set_visible(False)
+                self.panel_animations.pop(widget, None)
+
+        animation.connect("notify::state", on_state_changed)
+        self.panel_animations[widget] = animation
+        animation.play()
 
     def commands_from_editor(self, service_id: str) -> list[str]:
         text_view = self.settings_row_inputs[service_id]
