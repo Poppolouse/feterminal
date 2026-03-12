@@ -1,29 +1,31 @@
 {
   "backend": {
-    "command": ""
+    "commands": []
   },
   "frontend": {
-    "command": ""
+    "commands": []
   },
   "workers": [
     {
       "id": "worker-1",
       "name": "Worker 1",
-      "command": ""
+      "commands": []
     }
   ],
   "ai": {
     "codex": {
-      "command": "codex"
+      "commands": [
+        "codex"
+      ]
     },
     "claude_code": {
-      "command": ""
+      "commands": []
     },
     "copilot": {
-      "command": ""
+      "commands": []
     },
     "gemini": {
-      "command": ""
+      "commands": []
     }
   }
 }

@@ -4,6 +4,7 @@ import json
 import os
 import shlex
 import signal
+import sys
 import tempfile
 from copy import deepcopy
 from pathlib import Path
@@ -20,6 +21,7 @@ from gi.repository import Adw, Gio, GLib, Gdk, Gtk, Vte
 
 APP_ID = "io.poppolouse.feterminal"
 APP_DIR = Path(__file__).resolve().parent
+PROJECT_FILE_NAME = ".feterminal"
 CONFIG_PATH = APP_DIR / "shortcuts.json"
 WEBDEV_CONFIG_PATH = APP_DIR / "webdev.json"
 BRAND_ICON_DIR = APP_DIR / "assets" / "brand-icons"
@@ -77,14 +79,26 @@ DEFAULT_SHORTCUTS = {
     "close_window": ["<Ctrl><Shift>q"],
 }
 DEFAULT_WEBDEV_CONFIG = {
-    "backend": {"command": ""},
-    "frontend": {"command": ""},
-    "workers": [{"id": "worker-1", "name": "Worker 1", "command": ""}],
+    "backend": {"commands": []},
+    "frontend": {"commands": []},
+    "workers": [{"id": "worker-1", "name": "Worker 1", "commands": []}],
     "ai": {
-        "codex": {"command": ""},
-        "claude_code": {"command": ""},
-        "copilot": {"command": ""},
-        "gemini": {"command": ""},
+        "codex": {"commands": []},
+        "claude_code": {"commands": []},
+        "copilot": {"commands": []},
+        "gemini": {"commands": []},
+    },
+}
+DEFAULT_PROJECT_CONFIG = {
+    "name": "",
+    "backend": {"commands": []},
+    "frontend": {"commands": []},
+    "workers": [],
+    "ai": {
+        "codex": {"commands": []},
+        "claude_code": {"commands": []},
+        "copilot": {"commands": []},
+        "gemini": {"commands": []},
     },
 }
 
@@ -101,6 +115,45 @@ def deep_merge(base: dict, override: dict) -> dict:
 
 def child_setup_new_session():
     os.setsid()
+
+
+def normalize_command_list(value) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    return []
+
+
+def normalize_service_config(value) -> dict:
+    if not isinstance(value, dict):
+        return {"commands": []}
+    commands = normalize_command_list(value.get("commands"))
+    if not commands and isinstance(value.get("command"), str) and value["command"].strip():
+        commands = [value["command"].strip()]
+    return {"commands": commands}
+
+
+def resolve_project_file(cli_target: str | None) -> Path | None:
+    if cli_target:
+        target = Path(cli_target).expanduser().resolve()
+        if target.is_file():
+            if target.name == PROJECT_FILE_NAME:
+                return target
+            start_dir = target.parent
+        else:
+            start_dir = target
+    else:
+        start_dir = Path.cwd().resolve()
+
+    current = start_dir
+    while True:
+        candidate = current / PROJECT_FILE_NAME
+        if candidate.is_file():
+            return candidate
+        if current.parent == current:
+            return None
+        current = current.parent
 
 
 class ShortcutPreferencesWindow(Adw.PreferencesWindow):
@@ -167,9 +220,16 @@ class ShortcutPreferencesWindow(Adw.PreferencesWindow):
 
 
 class FeTerminalWindow(Adw.ApplicationWindow):
-    def __init__(self, app: Adw.Application):
+    def __init__(self, app: Adw.Application, cli_target: str | None):
         super().__init__(application=app, title="feterminal")
         self.set_default_size(1360, 820)
+
+        self.project_file_path = resolve_project_file(cli_target)
+        self.project_root = (
+            self.project_file_path.parent if self.project_file_path else Path.home()
+        )
+        self.project_name = ""
+        self.project_config = deepcopy(DEFAULT_PROJECT_CONFIG)
 
         self.shortcut_map = {}
         self.shortcut_values = {}
@@ -183,7 +243,6 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.terminal_tabs = {}
         self.service_sessions = {}
         self.service_rows = {}
-        self.service_row_boxes = {}
         self.category_revealers = {}
         self.category_arrow_images = {}
 
@@ -225,6 +284,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.settings_revealer.set_child(self.build_settings_panel())
 
         center_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        center_box.set_hexpand(True)
         center_box.append(self.content_stack)
         center_box.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         center_box.append(self.settings_revealer)
@@ -240,7 +300,6 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.sidebar_revealer.set_child(sidebar_shell)
 
         root_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        center_box.set_hexpand(True)
         root_content.append(center_box)
         root_content.append(self.sidebar_revealer)
 
@@ -263,6 +322,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.install_actions()
         self.load_shortcuts()
         self.load_webdev_config()
+        self.load_project_config()
+        self.apply_project_metadata()
         self.rebuild_settings_panel()
         self.rebuild_webdev_sidebar()
         self.add_terminal_tab()
@@ -364,15 +425,18 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         header.append(close_button)
         self.settings_container.append(header)
 
-        description = Gtk.Label(
-            label="Commands stay hidden until you open this panel from the Webdev gear button.",
-            wrap=True,
-            xalign=0,
+        description_text = (
+            "Commands stay hidden until you open this panel from the Webdev gear button."
         )
+        if self.project_file_path:
+            description_text += f"\nProject file: {self.project_file_path}"
+        description = Gtk.Label(label=description_text, wrap=True, xalign=0)
         description.add_css_class("dim-label")
         self.settings_container.append(description)
 
-        self.settings_container.append(self.build_settings_group("Backend", [("backend", "Backend")]))
+        self.settings_container.append(
+            self.build_settings_group("Backend", [("backend", "Backend")])
+        )
         self.settings_container.append(
             self.build_settings_group("Frontend", [("frontend", "Frontend")])
         )
@@ -387,7 +451,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         workers_header.append(add_worker_button)
         self.settings_container.append(workers_header)
         worker_ids = [(worker["id"], worker["name"]) for worker in self.webdev_config["workers"]]
-        self.settings_container.append(self.build_settings_group("", worker_ids, removable=True))
+        self.settings_container.append(
+            self.build_settings_group("", worker_ids, removable=True)
+        )
 
         ai_items = [(f"ai:{tool_name}", AI_LABELS[tool_name]) for tool_name in AI_TOOL_NAMES]
         self.settings_container.append(self.build_settings_group("AI", ai_items))
@@ -421,12 +487,16 @@ class FeTerminalWindow(Adw.ApplicationWindow):
                 title_row.append(remove_button)
             box.append(title_row)
 
-            entry = Gtk.Entry(
-                text=self.service_config_by_id(service_id)["command"],
-                placeholder_text="Command to run",
+            editor = self.build_commands_editor(service_id)
+            box.append(editor)
+
+            hint = Gtk.Label(
+                label="One command per line. They run in order.",
+                wrap=True,
+                xalign=0,
             )
-            box.append(entry)
-            self.settings_row_inputs[service_id] = entry
+            hint.add_css_class("caption")
+            box.append(hint)
 
             button_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
             save_button = Gtk.Button(label="Save")
@@ -439,6 +509,23 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             group.append(frame)
 
         return group
+
+    def build_commands_editor(self, service_id: str) -> Gtk.ScrolledWindow:
+        text_view = Gtk.TextView()
+        text_view.set_monospace(True)
+        text_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        text_view.set_top_margin(8)
+        text_view.set_bottom_margin(8)
+        text_view.set_left_margin(8)
+        text_view.set_right_margin(8)
+        buffer_ = text_view.get_buffer()
+        buffer_.set_text("\n".join(self.service_config_by_id(service_id)["commands"]))
+        self.settings_row_inputs[service_id] = text_view
+
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_min_content_height(92)
+        scroller.set_child(text_view)
+        return scroller
 
     def install_actions(self) -> None:
         actions = {
@@ -492,26 +579,104 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             self.set_status(f"Webdev file error: {exc}")
             return
 
-        merged = deep_merge(DEFAULT_WEBDEV_CONFIG, raw)
-        workers = []
+        self.webdev_config = self.normalize_webdev_config(raw)
+
+    def load_project_config(self) -> None:
+        if not self.project_file_path:
+            return
+        try:
+            raw = json.loads(self.project_file_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            self.set_status(f"Project file error: {exc}")
+            return
+
+        self.project_config = self.normalize_project_config(raw)
+        self.project_name = self.project_config["name"] or self.project_root.name
+
+        self.webdev_config["backend"] = deepcopy(self.project_config["backend"])
+        self.webdev_config["frontend"] = deepcopy(self.project_config["frontend"])
+        self.webdev_config["workers"] = deepcopy(
+            self.project_config["workers"] or self.webdev_config["workers"]
+        )
+        for tool_name in AI_TOOL_NAMES:
+            self.webdev_config["ai"][tool_name] = deepcopy(
+                self.project_config["ai"][tool_name]
+            )
+
+    def apply_project_metadata(self) -> None:
+        title = "feterminal"
+        if self.project_name:
+            title = f"{title} - {self.project_name}"
+            self.set_status(f"Loaded project: {self.project_name}")
+        self.set_title(title)
+
+    def normalize_webdev_config(self, raw: dict) -> dict:
+        merged = deep_merge(DEFAULT_WEBDEV_CONFIG, raw if isinstance(raw, dict) else {})
+        config = {
+            "backend": normalize_service_config(merged.get("backend", {})),
+            "frontend": normalize_service_config(merged.get("frontend", {})),
+            "workers": [],
+            "ai": {},
+        }
         for index, worker in enumerate(merged.get("workers", []), start=1):
-            workers.append(
+            config["workers"].append(
                 {
                     "id": worker.get("id", f"worker-{index}"),
                     "name": worker.get("name", f"Worker {index}"),
-                    "command": worker.get("command", ""),
+                    "commands": normalize_service_config(worker)["commands"],
                 }
             )
-        merged["workers"] = workers or deepcopy(DEFAULT_WEBDEV_CONFIG["workers"])
+        if not config["workers"]:
+            config["workers"] = deepcopy(DEFAULT_WEBDEV_CONFIG["workers"])
         for tool_name in AI_TOOL_NAMES:
-            merged["ai"][tool_name] = merged["ai"].get(tool_name, {"command": ""})
-        self.webdev_config = merged
+            config["ai"][tool_name] = normalize_service_config(
+                merged.get("ai", {}).get(tool_name, {})
+            )
+        return config
+
+    def normalize_project_config(self, raw: dict) -> dict:
+        merged = deep_merge(DEFAULT_PROJECT_CONFIG, raw if isinstance(raw, dict) else {})
+        config = {
+            "name": str(merged.get("name", "")).strip(),
+            "backend": normalize_service_config(merged.get("backend", {})),
+            "frontend": normalize_service_config(merged.get("frontend", {})),
+            "workers": [],
+            "ai": {},
+        }
+        for index, worker in enumerate(merged.get("workers", []), start=1):
+            config["workers"].append(
+                {
+                    "id": worker.get("id", f"worker-{index}"),
+                    "name": worker.get("name", f"Worker {index}"),
+                    "commands": normalize_service_config(worker)["commands"],
+                }
+            )
+        for tool_name in AI_TOOL_NAMES:
+            config["ai"][tool_name] = normalize_service_config(
+                merged.get("ai", {}).get(tool_name, {})
+            )
+        return config
 
     def write_shortcuts(self, shortcuts: dict) -> None:
         CONFIG_PATH.write_text(json.dumps(shortcuts, indent=2) + "\n", encoding="utf-8")
 
     def write_webdev_config(self, config: dict) -> None:
         WEBDEV_CONFIG_PATH.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+
+    def write_project_config(self) -> None:
+        if not self.project_file_path:
+            return
+        payload = {
+            "name": self.project_name or self.project_root.name,
+            "backend": deepcopy(self.webdev_config["backend"]),
+            "frontend": deepcopy(self.webdev_config["frontend"]),
+            "workers": deepcopy(self.webdev_config["workers"]),
+            "ai": deepcopy(self.webdev_config["ai"]),
+        }
+        self.project_file_path.write_text(
+            json.dumps(payload, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
     def save_shortcuts(self, shortcuts: dict) -> None:
         merged = {
@@ -538,7 +703,13 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def set_status(self, message: str) -> None:
         self.status_label.set_text(message)
 
-    def make_terminal_page(self, title: str, page_name: str) -> Vte.Terminal:
+    def default_working_directory(self) -> str:
+        return str(self.project_root if self.project_file_path else Path.home())
+
+    def service_working_directory(self, _service_id: str) -> str:
+        return self.default_working_directory()
+
+    def make_terminal_page(self, page_name: str) -> Vte.Terminal:
         terminal = Vte.Terminal()
         terminal.set_scrollback_lines(10000)
         terminal.set_hexpand(True)
@@ -550,7 +721,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def spawn_shell_terminal(self, terminal: Vte.Terminal) -> None:
         terminal.spawn_async(
             Vte.PtyFlags.DEFAULT,
-            str(Path.home()),
+            self.default_working_directory(),
             [os.environ.get("SHELL", "/bin/bash")],
             None,
             GLib.SpawnFlags.DEFAULT,
@@ -566,7 +737,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.tab_counter += 1
         page_name = f"terminal:{self.tab_counter}"
         title = f"Terminal {self.tab_counter}"
-        terminal = self.make_terminal_page(title, page_name)
+        terminal = self.make_terminal_page(page_name)
         self.spawn_shell_terminal(terminal)
         self.terminal_tabs[page_name] = {"title": title, "terminal": terminal}
         self.add_terminal_row(page_name, title)
@@ -595,23 +766,14 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def rebuild_webdev_sidebar(self) -> None:
         self.clear_box(self.webdev_tree_box)
         self.service_rows = {}
-        self.service_row_boxes = {}
         self.category_revealers = {}
         self.category_arrow_images = {}
 
         self.webdev_tree_box.append(
-            self.build_category_section(
-                "backend",
-                "Backend",
-                [("backend", "Backend", "backend")],
-            )
+            self.build_category_section("backend", "Backend", [("backend", "Backend", "backend")])
         )
         self.webdev_tree_box.append(
-            self.build_category_section(
-                "frontend",
-                "Frontend",
-                [("frontend", "Frontend", "frontend")],
-            )
+            self.build_category_section("frontend", "Frontend", [("frontend", "Frontend", "frontend")])
         )
         worker_items = [
             (worker["id"], worker["name"], "workers")
@@ -632,6 +794,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         header_button.add_css_class("flat")
         header_button.set_halign(Gtk.Align.FILL)
         header_button.connect("clicked", self.on_toggle_category_clicked, category_id)
+
         header_row = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL,
             spacing=6,
@@ -659,8 +822,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             margin_end=0,
         )
         for service_id, label, icon_group in items:
-            row = self.build_service_row(service_id, label, SERVICE_ICONS[icon_group])
-            content.append(row)
+            content.append(self.build_service_row(service_id, label, SERVICE_ICONS[icon_group]))
         revealer = Gtk.Revealer(
             transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN
         )
@@ -679,6 +841,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         open_button = Gtk.Button()
         open_button.add_css_class("flat")
         open_button.set_hexpand(True)
+
         content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         content.set_hexpand(True)
         content.append(self.make_service_icon(service_id, icon_name))
@@ -708,10 +871,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             "status": status,
             "start_button": start_button,
             "stop_button": stop_button,
-            "open_button": open_button,
-            "label": title,
         }
-        self.service_row_boxes[service_id] = row
         self.update_service_row(service_id)
         return row
 
@@ -774,6 +934,12 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         while row is not None:
             yield row
             row = row.get_next_sibling()
+
+    def commands_for_service(self, service_id: str) -> list[str]:
+        return self.service_config_by_id(service_id)["commands"]
+
+    def commands_script(self, service_id: str) -> str:
+        return "\n".join(self.commands_for_service(service_id))
 
     def action_copy(self, *_args) -> None:
         terminal = self.current_terminal()
@@ -880,11 +1046,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
                 self.terminal_listbox.remove(row)
                 break
         next_page = next(iter(self.terminal_tabs), None)
-        if next_page is None:
-            running_service = next(iter(self.service_sessions), None)
-            if running_service is not None:
-                self.select_page(self.service_page_name(running_service))
-        else:
+        if next_page:
             self.select_page(next_page)
         self.set_status("Closed terminal tab")
 
@@ -912,19 +1074,28 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.rebuild_settings_panel()
         self.settings_revealer.set_reveal_child(reveal)
 
+    def commands_from_editor(self, service_id: str) -> list[str]:
+        text_view = self.settings_row_inputs[service_id]
+        buffer_ = text_view.get_buffer()
+        raw_text = buffer_.get_text(buffer_.get_start_iter(), buffer_.get_end_iter(), True)
+        return [line.strip() for line in raw_text.splitlines() if line.strip()]
+
+    def persist_webdev_state(self) -> None:
+        if self.project_file_path:
+            self.write_project_config()
+        else:
+            self.write_webdev_config(self.webdev_config)
+
     def on_save_service_clicked(self, _button, service_id: str) -> None:
-        entry = self.settings_row_inputs[service_id]
-        config_ref = self.service_config_by_id(service_id)
-        config_ref["command"] = entry.get_text().strip()
-        self.write_webdev_config(self.webdev_config)
+        self.service_config_by_id(service_id)["commands"] = self.commands_from_editor(service_id)
+        self.persist_webdev_state()
         self.update_service_row(service_id)
-        self.set_status(f"Saved command for {self.service_label(service_id)}")
+        self.set_status(f"Saved commands for {self.service_label(service_id)}")
 
     def start_service(self, service_id: str) -> None:
-        config_ref = self.service_config_by_id(service_id)
-        command = config_ref.get("command", "").strip()
-        if not command:
-            self.set_status(f"No command set for {self.service_label(service_id)}")
+        commands = self.commands_for_service(service_id)
+        if not commands:
+            self.set_status(f"No commands set for {self.service_label(service_id)}")
             return
 
         session = self.service_sessions.get(service_id)
@@ -934,13 +1105,12 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             return
 
         page_name = self.service_page_name(service_id)
-        title = self.service_label(service_id)
-        terminal = self.make_terminal_page(title, page_name)
+        terminal = self.make_terminal_page(page_name)
         terminal.connect("child-exited", self.on_service_child_exited, service_id)
-        _, child_pid = terminal.spawn_sync(
+        _ok, child_pid = terminal.spawn_sync(
             Vte.PtyFlags.DEFAULT,
-            str(Path.home()),
-            ["/bin/bash", "-lc", command],
+            self.service_working_directory(service_id),
+            ["/bin/bash", "-lc", self.commands_script(service_id)],
             None,
             GLib.SpawnFlags.DEFAULT,
             child_setup_new_session,
@@ -954,7 +1124,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         }
         self.select_page(page_name)
         self.update_service_row(service_id)
-        self.set_status(f"Started {title}")
+        self.set_status(f"Started {self.service_label(service_id)}")
 
     def stop_service(self, service_id: str) -> None:
         session = self.service_sessions.get(service_id)
@@ -975,7 +1145,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.content_stack.remove(session["terminal"])
         if self.active_page_name == session["page_name"]:
             fallback = next(iter(self.terminal_tabs), None)
-            if fallback is not None:
+            if fallback:
                 self.select_page(fallback)
 
     def on_service_child_exited(self, _terminal, _status, service_id: str) -> None:
@@ -1001,9 +1171,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         while any(worker["id"] == f"worker-{next_index}" for worker in self.webdev_config["workers"]):
             next_index += 1
         self.webdev_config["workers"].append(
-            {"id": f"worker-{next_index}", "name": f"Worker {next_index}", "command": ""}
+            {"id": f"worker-{next_index}", "name": f"Worker {next_index}", "commands": []}
         )
-        self.write_webdev_config(self.webdev_config)
+        self.persist_webdev_state()
         self.rebuild_settings_panel()
         self.rebuild_webdev_sidebar()
         self.set_status("Added worker slot")
@@ -1014,7 +1184,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_config["workers"] = [
             worker for worker in self.webdev_config["workers"] if worker["id"] != service_id
         ]
-        self.write_webdev_config(self.webdev_config)
+        self.persist_webdev_state()
         self.rebuild_settings_panel()
         self.rebuild_webdev_sidebar()
         self.set_status("Removed worker slot")
@@ -1041,19 +1211,21 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
 
 class FeTerminalApp(Adw.Application):
-    def __init__(self):
+    def __init__(self, cli_target: str | None):
         super().__init__(application_id=APP_ID)
         self.window = None
+        self.cli_target = cli_target
 
     def do_activate(self):
         if self.window is None:
-            self.window = FeTerminalWindow(self)
+            self.window = FeTerminalWindow(self, self.cli_target)
         self.window.present()
 
 
 def main() -> int:
-    app = FeTerminalApp()
-    return app.run(None)
+    cli_target = sys.argv[1] if len(sys.argv) > 1 else None
+    app = FeTerminalApp(cli_target)
+    return app.run([sys.argv[0]])
 
 
 if __name__ == "__main__":

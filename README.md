@@ -16,6 +16,12 @@ A lightweight GTK4 + VTE terminal application that uses Adwaita styling and lets
 python3 /var/home/poppolouse/feterminal/feterminal.py
 ```
 
+You can also point it at a project file directly:
+
+```bash
+feterminal /path/to/project/.feterminal
+```
+
 ## Layout
 
 - Terminal tabs live in the right sidebar instead of the top edge.
@@ -42,7 +48,7 @@ Each slot can:
 
 The command editor lives in the collapsible settings panel and includes:
 
-- a command field
+- a multi-line command field
 - `Save`
 - dynamic worker management
 
@@ -77,6 +83,69 @@ You can open `Preferences` from the app menu or press `Ctrl+,`. You can also edi
 ```
 
 Note: terminals do not have a universal standard for pasting images directly into the session. This app handles `Ctrl+Shift+V` by converting the image into a file and inserting the file path into the command line.
+
+## Project files
+
+If a directory contains a `.feterminal` file, feterminal loads it automatically when started from that project. You can also pass the file path explicitly as an argument.
+
+Project behavior:
+
+- the window title becomes `feterminal - <project name>`
+- webdev commands are loaded from the project file
+- terminal tabs start in the project directory
+- AI sessions also start in the project directory
+- services can define multiple commands and they run in order
+
+Example `.feterminal`:
+
+```json
+{
+  "name": "My App",
+  "backend": {
+    "commands": [
+      "uv sync",
+      "uv run python manage.py runserver"
+    ]
+  },
+  "frontend": {
+    "commands": [
+      "pnpm install",
+      "pnpm dev"
+    ]
+  },
+  "workers": [
+    {
+      "id": "worker-1",
+      "name": "Queue Worker",
+      "commands": [
+        "uv run rq worker"
+      ]
+    }
+  ],
+  "ai": {
+    "codex": {
+      "commands": [
+        "codex"
+      ]
+    },
+    "claude_code": {
+      "commands": [
+        "claude"
+      ]
+    },
+    "copilot": {
+      "commands": [
+        "github-copilot-cli"
+      ]
+    },
+    "gemini": {
+      "commands": [
+        "gemini"
+      ]
+    }
+  }
+}
+```
 
 ## Desktop entry
 
