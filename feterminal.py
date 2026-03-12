@@ -35,6 +35,7 @@ SIDEBAR_WIDTH = 320
 SETTINGS_PANEL_WIDTH = 420
 SERVICE_LOG_DIR_NAME = ".feterminal-logs"
 ERROR_PATTERN = re.compile(r"(error|exception|traceback|fatal|failed)", re.IGNORECASE)
+DEBUG_PATTERN = re.compile(r"(debug|trace|verbose|dbg)", re.IGNORECASE)
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 SCRIPT_BIN = shutil.which("script") or "/home/linuxbrew/.linuxbrew/bin/script"
 ERROR_EVENT_START_PATTERN = re.compile(
@@ -57,6 +58,7 @@ SERVICE_ICONS = {
     "backend": "network-server-symbolic",
     "frontend": "applications-web-browser-symbolic",
     "workers": "system-run-symbolic",
+    "tests": "checkmark-symbolic",
     "ai": "applications-engineering-symbolic",
     "terminal": "utilities-terminal-symbolic",
 }
@@ -107,6 +109,7 @@ DEFAULT_WEBDEV_CONFIG = {
     "backend": {"commands": []},
     "frontend": {"commands": []},
     "workers": [{"id": "worker-1", "name": "Worker 1", "commands": []}],
+    "tests": [],
     "ai": {
         "codex": {"commands": []},
         "claude_code": {"commands": []},
@@ -120,6 +123,7 @@ DEFAULT_PROJECT_CONFIG = {
     "backend": {"commands": []},
     "frontend": {"commands": []},
     "workers": [],
+    "tests": [],
     "ai": {
         "codex": {"commands": []},
         "claude_code": {"commands": []},
@@ -202,6 +206,23 @@ def normalize_postgres_entries(value) -> list[dict]:
                 "password": str(entry.get("password", "")).strip(),
                 "host": str(entry.get("host", DEFAULT_POSTGRES_HOST)).strip() or DEFAULT_POSTGRES_HOST,
                 "port": int(entry.get("port", DEFAULT_POSTGRES_PORT)),
+                "commands": commands,
+            }
+        )
+    return entries
+
+
+def normalize_test_entries(value) -> list[dict]:
+    raw_entries = value if isinstance(value, list) else [value] if isinstance(value, dict) else []
+    entries = []
+    for index, entry in enumerate(raw_entries, start=1):
+        if not isinstance(entry, dict):
+            continue
+        commands = normalize_service_config(entry)["commands"]
+        entries.append(
+            {
+                "id": str(entry.get("id", f"test-{index}")).strip() or f"test-{index}",
+                "name": str(entry.get("name", f"Test {index}")).strip() or f"Test {index}",
                 "commands": commands,
             }
         )
@@ -332,6 +353,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.service_sessions = {}
         self.service_rows = {}
         self.error_pages = {}
+        self.debug_pages = {}
         self.category_revealers = {}
         self.category_arrow_images = {}
         self.sidebar_visible = True
@@ -540,8 +562,16 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_errors_button = Gtk.Button(label="Errors")
         self.webdev_errors_button.add_css_class("flat")
         self.webdev_errors_button.connect("clicked", self.on_webdev_view_mode_clicked, "errors")
+        self.webdev_debug_button = Gtk.Button(label="Debug")
+        self.webdev_debug_button.add_css_class("flat")
+        self.webdev_debug_button.connect("clicked", self.on_webdev_view_mode_clicked, "debug")
+        self.webdev_tests_button = Gtk.Button(label="Tests")
+        self.webdev_tests_button.add_css_class("flat")
+        self.webdev_tests_button.connect("clicked", self.on_webdev_view_mode_clicked, "tests")
         webdev_tabs.append(self.webdev_consoles_button)
         webdev_tabs.append(self.webdev_errors_button)
+        webdev_tabs.append(self.webdev_debug_button)
+        webdev_tabs.append(self.webdev_tests_button)
         content.append(webdev_tabs)
 
         self.webdev_revealer = Gtk.Revealer(
@@ -635,6 +665,10 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.settings_container.append(
             self.build_settings_group("", worker_ids, removable=True)
         )
+
+        test_items = [(test["id"], test["name"]) for test in self.webdev_config["tests"]]
+        if test_items:
+            self.settings_container.append(self.build_settings_group("Tests", test_items))
 
         ai_items = [(f"ai:{tool_name}", AI_LABELS[tool_name]) for tool_name in AI_TOOL_NAMES]
         self.settings_container.append(self.build_settings_group("AI", ai_items))
@@ -782,6 +816,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_config["workers"] = deepcopy(
             self.project_config["workers"] or self.webdev_config["workers"]
         )
+        self.webdev_config["tests"] = deepcopy(self.project_config["tests"])
         for tool_name in AI_TOOL_NAMES:
             self.webdev_config["ai"][tool_name] = deepcopy(
                 self.project_config["ai"][tool_name]
@@ -801,6 +836,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             "backend": normalize_service_config(merged.get("backend", {})),
             "frontend": normalize_service_config(merged.get("frontend", {})),
             "workers": [],
+            "tests": normalize_test_entries(merged.get("tests", [])),
             "ai": {},
         }
         for index, worker in enumerate(merged.get("workers", []), start=1):
@@ -841,6 +877,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             "backend": normalize_service_config(merged.get("backend", {})),
             "frontend": normalize_service_config(merged.get("frontend", {})),
             "workers": [],
+            "tests": normalize_test_entries(merged.get("tests", [])),
             "ai": {},
         }
         for index, worker in enumerate(merged.get("workers", []), start=1):
@@ -872,6 +909,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             "backend": deepcopy(self.webdev_config["backend"]),
             "frontend": deepcopy(self.webdev_config["frontend"]),
             "workers": deepcopy(self.webdev_config["workers"]),
+            "tests": deepcopy(self.webdev_config["tests"]),
             "ai": deepcopy(self.webdev_config["ai"]),
         }
         self.project_file_path.write_text(
@@ -1039,6 +1077,21 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         flush_current()
         return entries
 
+    def service_debug_entries(self, service_id: str) -> list[str]:
+        log_path = self.service_log_path(service_id)
+        if not log_path.exists():
+            return []
+        try:
+            text = strip_ansi_sequences(
+                log_path.read_text(encoding="utf-8", errors="ignore").replace("\r", "\n")
+            )
+        except OSError:
+            return []
+        return [line.strip() for line in text.splitlines() if DEBUG_PATTERN.search(line)]
+
+    def service_debug_count(self, service_id: str) -> int:
+        return len(self.service_debug_entries(service_id))
+
     def initial_terminal_banner_script(self) -> str:
         lines = [
             "clear",
@@ -1139,12 +1192,40 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_consoles_button.remove_css_class("flat")
         self.webdev_errors_button.remove_css_class("suggested-action")
         self.webdev_errors_button.remove_css_class("flat")
+        self.webdev_debug_button.remove_css_class("suggested-action")
+        self.webdev_debug_button.remove_css_class("flat")
+        self.webdev_tests_button.remove_css_class("suggested-action")
+        self.webdev_tests_button.remove_css_class("flat")
         if self.webdev_view_mode == "consoles":
             self.webdev_consoles_button.add_css_class("suggested-action")
             self.webdev_errors_button.add_css_class("flat")
-        else:
+            self.webdev_debug_button.add_css_class("flat")
+            self.webdev_tests_button.add_css_class("flat")
+        elif self.webdev_view_mode == "errors":
             self.webdev_errors_button.add_css_class("suggested-action")
             self.webdev_consoles_button.add_css_class("flat")
+            self.webdev_debug_button.add_css_class("flat")
+            self.webdev_tests_button.add_css_class("flat")
+        elif self.webdev_view_mode == "debug":
+            self.webdev_debug_button.add_css_class("suggested-action")
+            self.webdev_consoles_button.add_css_class("flat")
+            self.webdev_errors_button.add_css_class("flat")
+            self.webdev_tests_button.add_css_class("flat")
+        else:
+            self.webdev_consoles_button.add_css_class("flat")
+            self.webdev_errors_button.add_css_class("flat")
+            self.webdev_debug_button.add_css_class("flat")
+            self.webdev_tests_button.add_css_class("suggested-action")
+
+        if self.webdev_view_mode == "tests":
+            test_items = [
+                (test["id"], test["name"], "tests")
+                for test in self.webdev_config["tests"]
+            ]
+            self.webdev_tree_box.append(
+                self.build_category_section("tests", "Tests", test_items)
+            )
+            return
 
         self.webdev_tree_box.append(
             self.build_category_section(
@@ -1233,7 +1314,13 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         title = Gtk.Label(label=label_text, xalign=0)
         title.set_hexpand(True)
         content.append(title)
-        status = Gtk.Label(label="0 errors" if mode == "errors" else "idle", xalign=0)
+        if mode == "errors":
+            status_text = "0 errors"
+        elif mode == "debug":
+            status_text = "0 debug"
+        else:
+            status_text = "idle"
+        status = Gtk.Label(label=status_text, xalign=0)
         status.add_css_class("caption")
         content.append(status)
         open_button.set_child(content)
@@ -1280,6 +1367,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             return self.webdev_config["frontend"]
         if service_id.startswith("ai:"):
             return self.webdev_config["ai"][service_id.split(":", 1)[1]]
+        for test in self.webdev_config["tests"]:
+            if test["id"] == service_id:
+                return test
         for worker in self.webdev_config["workers"]:
             if worker["id"] == service_id:
                 return worker
@@ -1295,6 +1385,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             return "Frontend"
         if service_id.startswith("ai:"):
             return AI_LABELS[service_id.split(":", 1)[1]]
+        for test in self.webdev_config["tests"]:
+            if test["id"] == service_id:
+                return test["name"]
         return self.service_config_by_id(service_id)["name"]
 
     def service_page_name(self, service_id: str) -> str:
@@ -1302,6 +1395,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
     def service_error_page_name(self, service_id: str) -> str:
         return f"service-errors:{service_id}"
+
+    def service_debug_page_name(self, service_id: str) -> str:
+        return f"service-debug:{service_id}"
 
     def current_terminal(self):
         if self.active_page_name in self.terminal_tabs:
@@ -1604,6 +1700,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         session["child_pid"] = 0
         self.update_service_row(service_id)
         self.refresh_error_page(service_id)
+        self.refresh_debug_page(service_id)
         self.set_status(f"{self.service_label(service_id)} exited. Press stop to close the terminal.")
 
     def ensure_error_page(self, service_id: str) -> str:
@@ -1623,6 +1720,23 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.refresh_error_page(service_id)
         return page_name
 
+    def ensure_debug_page(self, service_id: str) -> str:
+        existing = self.debug_pages.get(service_id)
+        if existing:
+            return existing["page_name"]
+        page_name = self.service_debug_page_name(service_id)
+        text_view = Gtk.TextView(editable=False, monospace=True, cursor_visible=False, wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        text_view.set_top_margin(8)
+        text_view.set_bottom_margin(8)
+        text_view.set_left_margin(8)
+        text_view.set_right_margin(8)
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_child(text_view)
+        self.content_stack.add_named(scroller, page_name)
+        self.debug_pages[service_id] = {"page_name": page_name, "view": text_view, "container": scroller}
+        self.refresh_debug_page(service_id)
+        return page_name
+
     def refresh_error_page(self, service_id: str) -> None:
         page = self.error_pages.get(service_id)
         if not page:
@@ -1638,9 +1752,27 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         if current_text != text:
             buffer_.set_text(text)
 
+    def refresh_debug_page(self, service_id: str) -> None:
+        page = self.debug_pages.get(service_id)
+        if not page:
+            return
+        entries = self.service_debug_entries(service_id)
+        if entries:
+            chunks = [f"{entry}\n\n----------------------------------------" for entry in entries]
+            text = "\n\n".join(chunks)
+        else:
+            text = "No debug lines captured."
+        buffer_ = page["view"].get_buffer()
+        current_text = buffer_.get_text(buffer_.get_start_iter(), buffer_.get_end_iter(), True)
+        if current_text != text:
+            buffer_.set_text(text)
+
     def on_service_open_clicked(self, _button, service_id: str, mode: str) -> None:
         if mode == "errors":
             self.select_page(self.ensure_error_page(service_id))
+            return
+        if mode == "debug":
+            self.select_page(self.ensure_debug_page(service_id))
             return
         session = self.service_sessions.get(service_id)
         if session is None:
@@ -1652,6 +1784,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.start_service(service_id)
         if self.webdev_view_mode == "errors":
             self.select_page(self.ensure_error_page(service_id))
+        elif self.webdev_view_mode == "debug":
+            self.select_page(self.ensure_debug_page(service_id))
 
     def on_stop_service_clicked(self, _button, service_id: str) -> None:
         self.stop_service(service_id)
@@ -1688,6 +1822,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         if row["mode"] == "errors":
             error_count = self.service_error_count(service_id)
             row["status"].set_text(f"{error_count} errors")
+        elif row["mode"] == "debug":
+            debug_count = self.service_debug_count(service_id)
+            row["status"].set_text(f"{debug_count} debug")
         else:
             row["status"].set_text("running" if running else "stopped")
         row["start_button"].set_sensitive(not running)
@@ -1698,6 +1835,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             self.update_service_row(service_id)
         for service_id in list(self.error_pages):
             self.refresh_error_page(service_id)
+        for service_id in list(self.debug_pages):
+            self.refresh_debug_page(service_id)
         return True
 
     def on_close_request(self, *_args):

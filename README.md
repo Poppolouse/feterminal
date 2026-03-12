@@ -42,10 +42,12 @@ feterminal /path/to/project/.feterminal
 - Workers
 - AI: Codex, Claude Code, Copilot, Gemini
 
-Webdev also has two views:
+Webdev also has multiple views:
 
 - `Consoles`: the normal live service terminals
 - `Errors`: the same tree without AI entries, showing grouped error events and filtered error output
+- `Debug`: the same tree without AI entries, showing filtered debug-style lines
+- `Tests`: project-defined test commands, each runnable as its own terminal session
 
 Each slot can:
 
@@ -64,6 +66,7 @@ Workers are dynamic, so you can add more than one worker slot from the UI. Comma
 AI entries use brand icons bundled under [brand-icons](/var/home/poppolouse/Desktop/code/feterminal/assets/brand-icons).
 
 Service output is mirrored into per-service log files under `.feterminal-logs/` inside the active project, which powers the `Errors` view.
+The same mirrored logs also power the `Debug` view, which detects lines containing markers such as `DEBUG`, `TRACE`, `VERBOSE`, or `DBG`.
 
 The footer shows:
 
@@ -115,6 +118,7 @@ Project behavior:
 - AI sessions also start in the project directory
 - services can define multiple commands and they run in order
 - Postgres entries can either open a live database console or run explicit log commands
+- Tests entries define runnable test commands that appear under the `Tests` tab
 
 Example `.feterminal`:
 
@@ -156,6 +160,15 @@ Example `.feterminal`:
       "name": "Queue Worker",
       "commands": [
         "uv run rq worker"
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "id": "frontend-build",
+      "name": "Frontend Build",
+      "commands": [
+        "npm run build"
       ]
     }
   ],
