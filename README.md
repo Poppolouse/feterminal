@@ -1,27 +1,27 @@
 # feterminal
 
-GTK4 + VTE tabanli, Adwaita gorunum kullanan ve kisayollari hem arayuzden hem `shortcuts.json` dosyasindan degistirilebilen hafif bir terminal uygulamasi.
+A lightweight GTK4 + VTE terminal application that uses Adwaita styling and lets you change shortcuts either from the UI or from `shortcuts.json`.
 
-## Calistirma
+## Run
 
 ```bash
 python3 /var/home/poppolouse/feterminal/feterminal.py
 ```
 
-## Varsayilan kisayollar
+## Default shortcuts
 
-- `Ctrl+C`: kopyala
-- `Ctrl+V`: metin yapistir
-- `Ctrl+Shift+C`: aktif komuta `Ctrl+C` gonder
-- `Ctrl+Shift+V`: panodaki gorseli PNG olarak `/tmp` altina kaydedip yolunu yapistir
-- `Ctrl+Shift+R`: terminali resetle
-- `F5`: `shortcuts.json` dosyasini yeniden yukle
-- `Ctrl+,`: ayarlari ac
-- `Ctrl+Shift+Q`: pencereyi kapat
+- `Ctrl+C`: copy
+- `Ctrl+V`: paste text
+- `Ctrl+Shift+C`: send `Ctrl+C` to the active process
+- `Ctrl+Shift+V`: save the clipboard image as a PNG under `/tmp` and paste its path
+- `Ctrl+Shift+R`: reset the terminal
+- `F5`: reload `shortcuts.json`
+- `Ctrl+,`: open preferences
+- `Ctrl+Shift+Q`: close the window
 
-## Kisayol degistirme
+## Changing shortcuts
 
-Uygulama menusu icinden `Preferences` acilabilir veya `Ctrl+,` kullanilabilir. Istersen yine `/var/home/poppolouse/feterminal/shortcuts.json` dosyasini elle de duzenleyebilirsin. Ornek:
+You can open `Preferences` from the app menu or press `Ctrl+,`. You can also edit `/var/home/poppolouse/feterminal/shortcuts.json` manually. Example:
 
 ```json
 {
@@ -33,10 +33,10 @@ Uygulama menusu icinden `Preferences` acilabilir veya `Ctrl+,` kullanilabilir. I
 }
 ```
 
-Not: terminalde "gorselin kendisini" yapistirmak evrensel bir davranis degil. Bu uygulama `Ctrl+Shift+V` ile gorseli dosyaya cevirip yolunu komut satirina birakir.
+Note: terminals do not have a universal standard for pasting images directly into the session. This app handles `Ctrl+Shift+V` by converting the image into a file and inserting the file path into the command line.
 
-## Masaustu kisayolu
+## Desktop entry
 
-Uygulama dosyasi:
+Application file:
 
 - `/var/home/poppolouse/feterminal/feterminal.desktop`
