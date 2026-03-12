@@ -30,6 +30,7 @@ SIDEBAR_WIDTH = 320
 SETTINGS_PANEL_WIDTH = 420
 SERVICE_LOG_DIR_NAME = ".feterminal-logs"
 ERROR_PATTERN = re.compile(r"(error|exception|traceback|fatal|failed)", re.IGNORECASE)
+ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 AI_TOOL_NAMES = ["codex", "claude_code", "copilot", "gemini"]
 AI_LABELS = {
     "codex": "Codex",
@@ -191,6 +192,10 @@ def normalize_postgres_entries(value) -> list[dict]:
             }
         )
     return entries
+
+
+def strip_ansi_sequences(value: str) -> str:
+    return ANSI_ESCAPE_PATTERN.sub("", value)
 
 
 def resolve_project_file(
@@ -861,7 +866,13 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         if not log_path.exists():
             return 0
         try:
-            return sum(1 for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines() if ERROR_PATTERN.search(line))
+            return sum(
+                1
+                for line in strip_ansi_sequences(
+                    log_path.read_text(encoding="utf-8", errors="ignore").replace("\r", "\n")
+                ).splitlines()
+                if ERROR_PATTERN.search(line)
+            )
         except OSError:
             return 0
 
@@ -870,7 +881,10 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         if not log_path.exists():
             return []
         try:
-            return [line for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines() if ERROR_PATTERN.search(line)]
+            text = strip_ansi_sequences(
+                log_path.read_text(encoding="utf-8", errors="ignore").replace("\r", "\n")
+            )
+            return [line.strip() for line in text.splitlines() if ERROR_PATTERN.search(line)]
         except OSError:
             return []
 
@@ -1178,10 +1192,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         return (
             f"mkdir -p {shlex.quote(str(self.service_log_directory()))}\n"
             f": > {log_path}\n"
-            "set -o pipefail\n"
-            "{\n"
-            f"{commands}\n"
-            f"}} 2>&1 | tee -a {log_path}"
+            f"exec script -qef -c {shlex.quote(commands)} {log_path}"
         )
 
     def action_copy(self, *_args) -> None:
@@ -1439,7 +1450,11 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         if not page:
             return
         lines = self.service_error_lines(service_id)
-        text = "\n".join(lines) if lines else "No errors captured."
+        if lines:
+            chunks = [f"{line}\n\n----------------------------------------" for line in lines]
+            text = "\n\n".join(chunks)
+        else:
+            text = "No errors captured."
         buffer_ = page["view"].get_buffer()
         buffer_.set_text(text)
 
