@@ -225,6 +225,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, cli_target: str | None):
         super().__init__(application=app, title="feterminal")
         self.set_default_size(1360, 820)
+        self.install_css()
 
         self.project_file_path = resolve_project_file(cli_target)
         self.project_root = (
@@ -288,6 +289,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.settings_revealer.set_child(self.build_settings_panel())
         self.settings_revealer.connect("notify::child-revealed", self.on_settings_child_revealed)
         self.settings_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self.settings_shell.add_css_class("floating-panel")
         self.settings_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         self.settings_shell.append(self.settings_revealer)
         self.settings_shell.set_visible(False)
@@ -305,6 +307,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.sidebar_revealer.set_child(sidebar)
         self.sidebar_revealer.connect("notify::child-revealed", self.on_sidebar_child_revealed)
         self.sidebar_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self.sidebar_shell.add_css_class("floating-panel")
         self.sidebar_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         self.sidebar_shell.append(self.sidebar_revealer)
         self.sidebar_shell.set_visible(True)
@@ -352,6 +355,21 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         menu.append("Reset Terminal", "win.reset")
         menu.append("Close Window", "win.close_window")
         return menu
+
+    def install_css(self) -> None:
+        provider = Gtk.CssProvider()
+        provider.load_from_data(
+            b"""
+            .floating-panel {
+                background-color: @window_bg_color;
+            }
+            """
+        )
+        Gtk.StyleContext.add_provider_for_display(
+            self.get_display(),
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
 
     def build_sidebar(self) -> Gtk.Box:
         sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
