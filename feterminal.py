@@ -309,9 +309,14 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.sidebar_shell.append(self.sidebar_revealer)
         self.sidebar_shell.set_visible(True)
 
+        content_overlay = Gtk.Overlay()
+        content_overlay.set_child(center_box)
+        self.sidebar_shell.set_halign(Gtk.Align.END)
+        self.sidebar_shell.set_valign(Gtk.Align.FILL)
+        content_overlay.add_overlay(self.sidebar_shell)
+
         root_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        root_content.append(center_box)
-        root_content.append(self.sidebar_shell)
+        root_content.append(content_overlay)
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(header)
