@@ -248,6 +248,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.category_revealers = {}
         self.category_arrow_images = {}
         self.panel_animations = {}
+        self.sidebar_visible = True
+        self.settings_visible = False
 
         self.status_label = Gtk.Label(
             label="Ready",
@@ -288,7 +290,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.settings_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.settings_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         self.settings_shell.append(self.settings_revealer)
-        self.settings_shell.set_size_request(0, -1)
+        self.settings_shell.set_opacity(1.0)
         self.settings_shell.set_visible(False)
 
         center_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
@@ -300,7 +302,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.sidebar_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.sidebar_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         self.sidebar_shell.append(sidebar)
-        self.sidebar_shell.set_size_request(SIDEBAR_WIDTH + 1, -1)
+        self.sidebar_shell.set_opacity(1.0)
         self.sidebar_shell.set_visible(True)
 
         root_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
@@ -1063,7 +1065,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_revealer.set_reveal_child(not self.webdev_revealer.get_reveal_child())
 
     def on_toggle_sidebar_clicked(self, *_args) -> None:
-        self.animate_panel(self.sidebar_shell, SIDEBAR_WIDTH + 1, not self.sidebar_shell.get_visible())
+        self.sidebar_visible = not self.sidebar_visible
+        self.animate_panel_visibility(self.sidebar_shell, self.sidebar_visible)
 
     def on_toggle_category_clicked(self, _button, category_id: str) -> None:
         revealer = self.category_revealers[category_id]
@@ -1074,33 +1077,43 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         )
 
     def on_toggle_settings_clicked(self, *_args) -> None:
-        reveal = not self.settings_shell.get_visible()
+        reveal = not self.settings_visible
+        self.settings_visible = reveal
         self.rebuild_settings_panel()
         self.settings_revealer.set_reveal_child(reveal)
-        self.animate_panel(self.settings_shell, SETTINGS_PANEL_WIDTH + 1, reveal)
+        self.animate_panel_visibility(self.settings_shell, reveal)
 
-    def animate_panel(self, widget: Gtk.Widget, expanded_width: int, show: bool) -> None:
+    def animate_panel_visibility(self, widget: Gtk.Widget, show: bool) -> None:
         current_animation = self.panel_animations.get(widget)
         if current_animation is not None:
             current_animation.skip()
 
-        start_width = widget.get_width() if widget.get_visible() else 0
-        end_width = expanded_width if show else 0
-
         if show:
             widget.set_visible(True)
+            widget.set_opacity(0.0)
+            start_opacity = 0.0
+            end_opacity = 1.0
+        else:
+            start_opacity = widget.get_opacity()
+            end_opacity = 0.0
 
-        def apply_width(value):
-            widget.set_size_request(int(value), -1)
+        def apply_opacity(value):
+            widget.set_opacity(value)
 
-        target = Adw.CallbackAnimationTarget.new(apply_width)
-        animation = Adw.TimedAnimation.new(widget, float(start_width), float(end_width), 180, target)
+        target = Adw.CallbackAnimationTarget.new(apply_opacity)
+        animation = Adw.TimedAnimation.new(
+            widget,
+            float(start_opacity),
+            float(end_opacity),
+            180,
+            target,
+        )
 
         def on_state_changed(anim, _pspec):
             if anim.get_state() == Adw.AnimationState.FINISHED:
-                widget.set_size_request(end_width, -1)
                 if not show:
                     widget.set_visible(False)
+                    widget.set_opacity(1.0)
                 self.panel_animations.pop(widget, None)
 
         animation.connect("notify::state", on_state_changed)
