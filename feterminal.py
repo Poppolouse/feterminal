@@ -719,10 +719,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         if service_id.startswith("ai:"):
             icon_path = AI_ICON_FILES[service_id.split(":", 1)[1]]
             if icon_path.exists():
-                picture = Gtk.Picture.new_for_filename(str(icon_path))
-                picture.set_size_request(16, 16)
-                picture.set_can_shrink(True)
-                return picture
+                image = Gtk.Image.new_from_file(str(icon_path))
+                image.set_pixel_size(16)
+                return image
         return Gtk.Image.new_from_icon_name(fallback_icon_name)
 
     def service_config_by_id(self, service_id: str) -> dict:
