@@ -247,7 +247,6 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.service_rows = {}
         self.category_revealers = {}
         self.category_arrow_images = {}
-        self.panel_animations = {}
         self.sidebar_visible = True
         self.settings_visible = False
 
@@ -285,12 +284,12 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.settings_revealer = Gtk.Revealer(
             transition_type=Gtk.RevealerTransitionType.SLIDE_LEFT
         )
-        self.settings_revealer.set_reveal_child(True)
+        self.settings_revealer.set_reveal_child(False)
         self.settings_revealer.set_child(self.build_settings_panel())
+        self.settings_revealer.connect("notify::child-revealed", self.on_settings_child_revealed)
         self.settings_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.settings_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         self.settings_shell.append(self.settings_revealer)
-        self.settings_shell.set_opacity(1.0)
         self.settings_shell.set_visible(False)
 
         center_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
@@ -299,10 +298,15 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         center_box.append(self.settings_shell)
 
         sidebar = self.build_sidebar()
+        self.sidebar_revealer = Gtk.Revealer(
+            transition_type=Gtk.RevealerTransitionType.SLIDE_LEFT
+        )
+        self.sidebar_revealer.set_reveal_child(True)
+        self.sidebar_revealer.set_child(sidebar)
+        self.sidebar_revealer.connect("notify::child-revealed", self.on_sidebar_child_revealed)
         self.sidebar_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.sidebar_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
-        self.sidebar_shell.append(sidebar)
-        self.sidebar_shell.set_opacity(1.0)
+        self.sidebar_shell.append(self.sidebar_revealer)
         self.sidebar_shell.set_visible(True)
 
         root_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
@@ -1066,7 +1070,9 @@ class FeTerminalWindow(Adw.ApplicationWindow):
 
     def on_toggle_sidebar_clicked(self, *_args) -> None:
         self.sidebar_visible = not self.sidebar_visible
-        self.animate_panel_visibility(self.sidebar_shell, self.sidebar_visible)
+        if self.sidebar_visible:
+            self.sidebar_shell.set_visible(True)
+        self.sidebar_revealer.set_reveal_child(self.sidebar_visible)
 
     def on_toggle_category_clicked(self, _button, category_id: str) -> None:
         revealer = self.category_revealers[category_id]
@@ -1080,45 +1086,17 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         reveal = not self.settings_visible
         self.settings_visible = reveal
         self.rebuild_settings_panel()
+        if reveal:
+            self.settings_shell.set_visible(True)
         self.settings_revealer.set_reveal_child(reveal)
-        self.animate_panel_visibility(self.settings_shell, reveal)
 
-    def animate_panel_visibility(self, widget: Gtk.Widget, show: bool) -> None:
-        current_animation = self.panel_animations.get(widget)
-        if current_animation is not None:
-            current_animation.skip()
+    def on_sidebar_child_revealed(self, _revealer, _pspec) -> None:
+        if not self.sidebar_visible and not self.sidebar_revealer.get_child_revealed():
+            self.sidebar_shell.set_visible(False)
 
-        if show:
-            widget.set_visible(True)
-            widget.set_opacity(0.0)
-            start_opacity = 0.0
-            end_opacity = 1.0
-        else:
-            start_opacity = widget.get_opacity()
-            end_opacity = 0.0
-
-        def apply_opacity(value):
-            widget.set_opacity(value)
-
-        target = Adw.CallbackAnimationTarget.new(apply_opacity)
-        animation = Adw.TimedAnimation.new(
-            widget,
-            float(start_opacity),
-            float(end_opacity),
-            180,
-            target,
-        )
-
-        def on_state_changed(anim, _pspec):
-            if anim.get_state() == Adw.AnimationState.FINISHED:
-                if not show:
-                    widget.set_visible(False)
-                    widget.set_opacity(1.0)
-                self.panel_animations.pop(widget, None)
-
-        animation.connect("notify::state", on_state_changed)
-        self.panel_animations[widget] = animation
-        animation.play()
+    def on_settings_child_revealed(self, _revealer, _pspec) -> None:
+        if not self.settings_visible and not self.settings_revealer.get_child_revealed():
+            self.settings_shell.set_visible(False)
 
     def commands_from_editor(self, service_id: str) -> list[str]:
         text_view = self.settings_row_inputs[service_id]
