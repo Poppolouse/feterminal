@@ -1,6 +1,6 @@
 # feterminal
 
-GTK4 + VTE tabanli, kisayollari `shortcuts.json` dosyasindan degistirilebilen hafif bir terminal uygulamasi.
+GTK4 + VTE tabanli, Adwaita gorunum kullanan ve kisayollari hem arayuzden hem `shortcuts.json` dosyasindan degistirilebilen hafif bir terminal uygulamasi.
 
 ## Calistirma
 
@@ -16,18 +16,20 @@ python3 /var/home/poppolouse/feterminal/feterminal.py
 - `Ctrl+Shift+V`: panodaki gorseli PNG olarak `/tmp` altina kaydedip yolunu yapistir
 - `Ctrl+Shift+R`: terminali resetle
 - `F5`: `shortcuts.json` dosyasini yeniden yukle
+- `Ctrl+,`: ayarlari ac
 - `Ctrl+Shift+Q`: pencereyi kapat
 
 ## Kisayol degistirme
 
-`/var/home/poppolouse/feterminal/shortcuts.json` dosyasini duzenle. Ornek:
+Uygulama menusu icinden `Preferences` acilabilir veya `Ctrl+,` kullanilabilir. Istersen yine `/var/home/poppolouse/feterminal/shortcuts.json` dosyasini elle de duzenleyebilirsin. Ornek:
 
 ```json
 {
   "copy": ["<Ctrl>c"],
   "send_interrupt": ["<Ctrl><Shift>c"],
   "paste": ["<Ctrl>v"],
-  "paste_image": ["<Ctrl><Shift>v"]
+  "paste_image": ["<Ctrl><Shift>v"],
+  "open_preferences": ["<Ctrl>comma"]
 }
 ```
 
