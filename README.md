@@ -13,7 +13,7 @@ A lightweight GTK4 + VTE terminal application that uses Adwaita styling and lets
 ## Run
 
 ```bash
-python3 /var/home/poppolouse/feterminal/feterminal.py
+python3 /var/home/poppolouse/Desktop/code/feterminal/feterminal.py
 ```
 
 You can also point it at a project file directly:
@@ -53,9 +53,9 @@ The command editor lives in the collapsible settings panel and includes:
 - `Save`
 - dynamic worker management
 
-Workers are dynamic, so you can add more than one worker slot from the UI. Commands are stored in [webdev.json](/var/home/poppolouse/feterminal/webdev.json).
+Workers are dynamic, so you can add more than one worker slot from the UI. Commands are stored in [webdev.json](/var/home/poppolouse/Desktop/code/feterminal/webdev.json).
 
-AI entries use brand icons bundled under [brand-icons](/var/home/poppolouse/feterminal/assets/brand-icons).
+AI entries use brand icons bundled under [brand-icons](/var/home/poppolouse/Desktop/code/feterminal/assets/brand-icons).
 
 ## File association
 
@@ -75,7 +75,7 @@ AI entries use brand icons bundled under [brand-icons](/var/home/poppolouse/fete
 
 ## Changing shortcuts
 
-You can open `Preferences` from the app menu or press `Ctrl+,`. You can also edit `/var/home/poppolouse/feterminal/shortcuts.json` manually. Example:
+You can open `Preferences` from the app menu or press `Ctrl+,`. You can also edit `/var/home/poppolouse/Desktop/code/feterminal/shortcuts.json` manually. Example:
 
 ```json
 {
@@ -156,4 +156,4 @@ Example `.feterminal`:
 
 Application file:
 
-- `/var/home/poppolouse/feterminal/io.poppolouse.feterminal.desktop`
+- `/var/home/poppolouse/Desktop/code/feterminal/io.poppolouse.feterminal.desktop`
