@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import urllib.request
 from copy import deepcopy
 from pathlib import Path
 
@@ -18,8 +19,9 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 gi.require_version("Vte", "3.91")
+gi.require_version("GdkPixbuf", "2.0")
 
-from gi.repository import Adw, Gio, GLib, Gdk, Gtk, Vte
+from gi.repository import Adw, Gio, GLib, Gdk, GdkPixbuf, Gtk, Vte
 
 
 APP_ID = "io.poppolouse.feterminal"
@@ -28,6 +30,7 @@ PROJECT_FILE_NAME = ".feterminal"
 CONFIG_PATH = APP_DIR / "shortcuts.json"
 WEBDEV_CONFIG_PATH = APP_DIR / "webdev.json"
 BRAND_ICON_DIR = APP_DIR / "assets" / "brand-icons"
+AVATAR_CACHE_DIR = Path(GLib.get_user_cache_dir()) / "feterminal"
 SIDEBAR_WIDTH = 320
 SETTINGS_PANEL_WIDTH = 420
 SERVICE_LOG_DIR_NAME = ".feterminal-logs"
@@ -350,9 +353,27 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             margin_top=6,
             margin_bottom=6,
             margin_start=12,
-            margin_end=12,
+            margin_end=4,
         )
         self.git_status_label.add_css_class("dim-label")
+        self.github_user_label = Gtk.Label(
+            label="",
+            xalign=1,
+            margin_top=6,
+            margin_bottom=6,
+            margin_start=0,
+            margin_end=12,
+        )
+        self.github_user_label.add_css_class("dim-label")
+        self.github_avatar_image = Adw.Avatar.new(16, "", False)
+        self.github_avatar_image.set_size_request(16, 16)
+        self.github_avatar_image.set_hexpand(False)
+        self.github_avatar_image.set_vexpand(False)
+        self.github_avatar_image.set_halign(Gtk.Align.CENTER)
+        self.github_avatar_image.set_valign(Gtk.Align.CENTER)
+        self.github_avatar_image.set_margin_top(6)
+        self.github_avatar_image.set_margin_bottom(6)
+        self.github_avatar_image.set_margin_end(6)
 
         header = Adw.HeaderBar()
         new_tab_button = Gtk.Button(icon_name="tab-new-symbolic")
@@ -424,6 +445,8 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         status_bar.append(self.status_label)
         status_bar.append(Gtk.Box(hexpand=True))
         status_bar.append(self.git_status_label)
+        status_bar.append(self.github_avatar_image)
+        status_bar.append(self.github_user_label)
         outer_box.append(status_bar)
         toolbar_view.set_content(outer_box)
         self.set_content(toolbar_view)
@@ -906,6 +929,17 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             return git_user
         return "unknown"
 
+    def github_avatar_path(self, github_user: str) -> Path | None:
+        if not github_user or github_user == "unknown":
+            return None
+        AVATAR_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        avatar_path = AVATAR_CACHE_DIR / f"{github_user}.png"
+        try:
+            urllib.request.urlretrieve(f"https://github.com/{github_user}.png", avatar_path)
+        except OSError:
+            return None
+        return avatar_path
+
     def refresh_git_status(self) -> None:
         branch = self.run_capture(["git", "branch", "--show-current"], self.project_root)
         commit = self.run_capture(["git", "rev-parse", "--short", "HEAD"], self.project_root)
@@ -913,7 +947,23 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             self.git_status_label.set_text("")
             return
         github_user = self.github_account_label()
-        self.git_status_label.set_text(f"{branch}@{commit}  github:{github_user}")
+        self.github_avatar_image.set_text(github_user[:1].upper() if github_user and github_user != "unknown" else "?")
+        avatar_path = self.github_avatar_path(github_user)
+        if avatar_path and avatar_path.exists():
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                    str(avatar_path),
+                    16,
+                    16,
+                    True,
+                )
+            except GLib.Error:
+                self.github_avatar_image.set_custom_image(None)
+            else:
+                texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+                self.github_avatar_image.set_custom_image(texture)
+        self.git_status_label.set_text(f"{branch}@{commit} |")
+        self.github_user_label.set_text(github_user)
 
     def default_working_directory(self) -> str:
         return str(self.project_root if self.project_file_path else Path.home())
@@ -1667,7 +1717,7 @@ class FeTerminalApp(Adw.Application):
     def __init__(self, cli_target: str | None):
         super().__init__(
             application_id=APP_ID,
-            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE | Gio.ApplicationFlags.NON_UNIQUE,
         )
         self.window = None
         self.cli_target = cli_target
