@@ -39,4 +39,4 @@ Note: terminals do not have a universal standard for pasting images directly int
 
 Application file:
 
-- `/var/home/poppolouse/feterminal/feterminal.desktop`
+- `/var/home/poppolouse/feterminal/io.poppolouse.feterminal.desktop`
