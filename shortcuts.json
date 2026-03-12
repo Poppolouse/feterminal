@@ -1,0 +1,9 @@
+{
+  "copy": ["<Ctrl>c"],
+  "paste": ["<Ctrl>v"],
+  "send_interrupt": ["<Ctrl><Shift>c"],
+  "paste_image": ["<Ctrl><Shift>v"],
+  "reset": ["<Ctrl><Shift>r"],
+  "reload_shortcuts": ["F5"],
+  "close_window": ["<Ctrl><Shift>q"]
+}
