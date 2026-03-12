@@ -32,8 +32,8 @@ AI_LABELS = {
 }
 SERVICE_ICONS = {
     "backend": "network-server-symbolic",
-    "frontend": "applications-internet-symbolic",
-    "workers": "folder-download-symbolic",
+    "frontend": "applications-web-browser-symbolic",
+    "workers": "system-run-symbolic",
     "ai": "applications-engineering-symbolic",
     "terminal": "utilities-terminal-symbolic",
 }
