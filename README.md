@@ -7,7 +7,7 @@ A lightweight GTK4 + VTE terminal application that uses Adwaita styling and lets
 </p>
 
 <p align="center">
-  <img src="assets/feterminal-screenshot.svg" alt="feterminal screenshot">
+  <img src="assets/feterminal-screenshot.png" alt="feterminal screenshot">
 </p>
 
 ## Run
