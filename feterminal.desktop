@@ -2,7 +2,7 @@
 Name=feterminal
 Comment=Lightweight GTK terminal with editable shortcuts
 Exec=/var/home/poppolouse/.local/bin/feterminal
-Icon=utilities-terminal
+Icon=feterminal
 Terminal=false
 Type=Application
 Categories=System;TerminalEmulator;GTK;
