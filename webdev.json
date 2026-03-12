@@ -1,0 +1,29 @@
+{
+  "backend": {
+    "command": ""
+  },
+  "frontend": {
+    "command": ""
+  },
+  "workers": [
+    {
+      "id": "worker-1",
+      "name": "Worker 1",
+      "command": ""
+    }
+  ],
+  "ai": {
+    "codex": {
+      "command": "codex"
+    },
+    "claude_code": {
+      "command": ""
+    },
+    "copilot": {
+      "command": ""
+    },
+    "gemini": {
+      "command": ""
+    }
+  }
+}

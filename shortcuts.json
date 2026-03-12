@@ -3,6 +3,7 @@
   "paste": ["<Ctrl>v"],
   "send_interrupt": ["<Ctrl><Shift>c"],
   "paste_image": ["<Ctrl><Shift>v"],
+  "new_terminal_tab": ["<Ctrl><Shift>t"],
   "reset": ["<Ctrl><Shift>r"],
   "reload_shortcuts": ["F5"],
   "open_preferences": ["<Ctrl>comma"],
