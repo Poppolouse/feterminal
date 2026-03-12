@@ -746,17 +746,22 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def initial_terminal_banner_script(self) -> str:
         lines = [
             "clear",
-            "printf '\\033[1;35mWelcome to feterminal\\033[0m\\n\\n'",
+            "printf '\\033[38;5;183m╭──────────────────────────────────────────────────────────────╮\\033[0m\\n'",
+            "printf '\\033[38;5;183m│\\033[0m \\033[1;35mfeterminal\\033[0m                                              \\033[38;5;183m│\\033[0m\\n'",
+            "printf '\\033[38;5;183m│\\033[0m Right-side terminals, Webdev processes, and project files   \\033[38;5;183m│\\033[0m\\n'",
+            "printf '\\033[38;5;183m╰──────────────────────────────────────────────────────────────╯\\033[0m\\n\\n'",
         ]
         if self.project_name:
             lines.append(
-                f"printf '  Project: \\033[1;37m{self.project_name}\\033[0m\\n'"
+                f"printf '  \\033[1;37mProject\\033[0m    {self.project_name}\\n'"
             )
         lines.extend(
             [
-                "printf '  Tabs: terminal sessions live in the right sidebar\\n'",
-                "printf '  Webdev: backend, frontend, workers, and AI tools are grouped on the right\\n'",
-                "printf '  Settings: use the gear icon in Webdev to edit commands\\n\\n'",
+                "printf '  \\033[1;37mSidebar\\033[0m    Terminal tabs and Webdev tree live on the right\\n'",
+                "printf '  \\033[1;37mSettings\\033[0m   Use the Webdev gear button to edit commands\\n'",
+                "printf '  \\033[1;37mProject file\\033[0m .feterminal loads project-specific commands\\n\\n'",
+                "printf '  \\033[38;5;117mGitHub\\033[0m     https://github.com/Poppolouse/feterminal\\n'",
+                "printf '  \\033[38;5;117mRelease\\033[0m    v0.2.0\\n\\n'",
             ]
         )
         return "\n".join(lines) + "\n"
