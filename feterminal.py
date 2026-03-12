@@ -250,6 +250,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.category_arrow_images = {}
         self.sidebar_visible = True
         self.settings_visible = False
+        self.bootstrap_files = []
 
         self.status_label = Gtk.Label(
             label="Ready",
@@ -742,7 +743,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def service_working_directory(self, _service_id: str) -> str:
         return self.default_working_directory()
 
-    def initial_terminal_banner(self) -> bytes:
+    def initial_terminal_banner_script(self) -> str:
         lines = [
             "clear",
             "printf '\\033[1;35mWelcome to feterminal\\033[0m\\n\\n'",
@@ -758,7 +759,22 @@ class FeTerminalWindow(Adw.ApplicationWindow):
                 "printf '  Settings: use the gear icon in Webdev to edit commands\\n\\n'",
             ]
         )
-        return ("\n".join(lines) + "\n").encode("utf-8")
+        return "\n".join(lines) + "\n"
+
+    def shell_argv_for_terminal(self) -> list[str]:
+        shell = os.environ.get("SHELL", "/bin/bash")
+        if Path(shell).name == "bash":
+            fd, rc_path = tempfile.mkstemp(prefix="feterminal-bashrc-", suffix=".sh")
+            os.close(fd)
+            rcfile = Path(rc_path)
+            rcfile.write_text(
+                "if [ -f ~/.bashrc ]; then . ~/.bashrc; fi\n"
+                + self.initial_terminal_banner_script(),
+                encoding="utf-8",
+            )
+            self.bootstrap_files.append(rcfile)
+            return [shell, "--rcfile", str(rcfile), "-i"]
+        return [shell]
 
     def make_terminal_page(self, page_name: str) -> Vte.Terminal:
         terminal = Vte.Terminal()
@@ -773,7 +789,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         terminal.spawn_async(
             Vte.PtyFlags.DEFAULT,
             self.default_working_directory(),
-            [os.environ.get("SHELL", "/bin/bash")],
+            self.shell_argv_for_terminal(),
             None,
             GLib.SpawnFlags.DEFAULT,
             None,
@@ -783,13 +799,6 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             None,
             None,
         )
-        banner_bytes = self.initial_terminal_banner()
-
-        def print_banner():
-            terminal.feed_child(banner_bytes)
-            return False
-
-        GLib.timeout_add(120, print_banner)
 
     def add_terminal_tab(self) -> None:
         self.tab_counter += 1
@@ -1279,6 +1288,11 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def on_close_request(self, *_args):
         for service_id in list(self.service_sessions):
             self.stop_service(service_id)
+        for path in self.bootstrap_files:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
         return False
 
 
