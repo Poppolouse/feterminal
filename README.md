@@ -2,6 +2,14 @@
 
 A lightweight GTK4 + VTE terminal application that uses Adwaita styling and lets you change shortcuts either from the UI or from `shortcuts.json`.
 
+<p align="center">
+  <img src="assets/feterminal.svg" alt="feterminal icon" width="128">
+</p>
+
+<p align="center">
+  <img src="assets/feterminal-screenshot.svg" alt="feterminal screenshot">
+</p>
+
 ## Run
 
 ```bash

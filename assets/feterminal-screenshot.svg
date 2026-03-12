@@ -1,0 +1,76 @@
+<svg width="1400" height="900" viewBox="0 0 1400 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="900" rx="24" fill="#101115"/>
+  <rect x="2" y="2" width="1396" height="896" rx="22" stroke="#2C3AA7" stroke-width="4"/>
+  <rect x="0" y="0" width="1400" height="72" rx="24" fill="#26262D"/>
+  <path d="M0 48H1400V72H0V48Z" fill="#2B2B31"/>
+  <text x="700" y="42" text-anchor="middle" fill="#9A9AA0" font-family="Cantarell, sans-serif" font-size="34" font-weight="700">feterminal</text>
+  <g fill="#3A3B45">
+    <circle cx="1224" cy="36" r="18"/>
+    <circle cx="1280" cy="36" r="18"/>
+    <circle cx="1336" cy="36" r="18"/>
+  </g>
+  <g fill="#8D8E98">
+    <rect x="1215" y="35" width="18" height="2" rx="1"/>
+    <rect x="1273" y="29" width="14" height="14" rx="1.5" stroke="#8D8E98" stroke-width="2" fill="none"/>
+    <path d="M1328 28L1344 44M1344 28L1328 44" stroke="#8D8E98" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  <g fill="#8D8E98">
+    <rect x="1190" y="26" width="18" height="4" rx="2"/>
+    <rect x="1190" y="34" width="18" height="4" rx="2"/>
+    <rect x="1190" y="42" width="18" height="4" rx="2"/>
+  </g>
+
+  <rect x="24" y="96" width="1352" height="736" fill="#000000"/>
+
+  <g font-family="'DejaVu Sans Mono', monospace" font-size="20">
+    <text x="34" y="142" fill="#FF00FF" font-weight="700">Welcome to Bazzite 🎮</text>
+    <text x="34" y="194" fill="#F5F5F5">ⓘ </text>
+    <text x="68" y="194" fill="#FF00FF" font-weight="700">bazzite-gnome:stable</text>
+    <text x="34" y="228" fill="#F5F5F5">🖥 </text>
+    <text x="68" y="228" fill="#FF00FF" font-weight="700">Boot Status: Healthy ☻</text>
+
+    <text x="44" y="282" fill="#BFBFBF">╰▶ Command</text>
+    <text x="458" y="282" fill="#BFBFBF">Description</text>
+    <path d="M36 300H426" stroke="#C2C2C2" stroke-width="1"/>
+    <path d="M438 300H860" stroke="#C2C2C2" stroke-width="1"/>
+    <path d="M442 258V422" stroke="#C2C2C2" stroke-width="1"/>
+
+    <text x="54" y="338" fill="#FF00FF" font-weight="700">ujust --choose</text>
+    <text x="458" y="338" fill="#BDBDBD">List all available commands</text>
+    <text x="54" y="370" fill="#FF00FF" font-weight="700">ujust toggle-user-motd</text>
+    <text x="458" y="370" fill="#BDBDBD">Toggle this banner on/off</text>
+    <text x="54" y="402" fill="#FF00FF" font-weight="700">fastfetch</text>
+    <text x="458" y="402" fill="#BDBDBD">View system information</text>
+    <text x="54" y="434" fill="#FF00FF" font-weight="700">brew help</text>
+    <text x="458" y="434" fill="#BDBDBD">Manage command line packages</text>
+
+    <text x="34" y="488" fill="#C5C5C5">ⓘ It is </text>
+    <text x="126" y="488" fill="#FF00FF" font-weight="700">always</text>
+    <text x="208" y="488" fill="#C5C5C5"> better to install packages with Distrobox rather than layer</text>
+    <text x="34" y="518" fill="#C5C5C5">them with rpm-ostree. </text>
+    <text x="290" y="518" fill="#FF00FF" font-weight="700">ujust distrobox</text>
+    <text x="486" y="518" fill="#C5C5C5"> makes it easy!</text>
+    <text x="34" y="548" fill="#C5C5C5">More info</text>
+    <text x="34" y="578" fill="#FF00FF" text-decoration="underline">https://docs.bazzite.gg/Installing_and_Managing_Software/Distrobox/</text>
+
+    <text x="34" y="632" fill="#C5C5C5">• </text>
+    <text x="58" y="632" fill="#F5F5F5">Report an issue </text>
+    <text x="250" y="632" fill="#FF00FF">https://issues.bazzite.gg/</text>
+    <text x="34" y="664" fill="#C5C5C5">• </text>
+    <text x="58" y="664" fill="#F5F5F5">Documentation </text>
+    <text x="218" y="664" fill="#FF00FF">https://docs.bazzite.gg/</text>
+    <text x="34" y="696" fill="#C5C5C5">• </text>
+    <text x="58" y="696" fill="#F5F5F5">Discord </text>
+    <text x="170" y="696" fill="#FF00FF">https://discord.bazzite.gg/</text>
+    <text x="34" y="728" fill="#C5C5C5">• </text>
+    <text x="58" y="728" fill="#F5F5F5">Bluesky </text>
+    <text x="170" y="728" fill="#FF00FF">https://bluesky.bazzite.gg/</text>
+
+    <text x="10" y="764" fill="#00FF5B" font-weight="700">poppolouse@bazzite</text>
+    <text x="232" y="764" fill="#D4D4D4">:~$</text>
+    <rect x="284" y="742" width="14" height="26" fill="#F5F5F5"/>
+  </g>
+
+  <rect x="0" y="832" width="1400" height="68" rx="0" fill="#2C2D34"/>
+  <text x="22" y="875" fill="#9A9AA0" font-family="Cantarell, sans-serif" font-size="30">Shortcuts file: /var/home/poppolouse/feterminal/shortcuts.json</text>
+</svg>
