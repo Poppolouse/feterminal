@@ -282,12 +282,19 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         )
         self.settings_revealer.set_reveal_child(False)
         self.settings_revealer.set_child(self.build_settings_panel())
+        settings_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        settings_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
+        settings_shell.append(self.settings_revealer)
+        self.settings_shell_revealer = Gtk.Revealer(
+            transition_type=Gtk.RevealerTransitionType.SLIDE_LEFT
+        )
+        self.settings_shell_revealer.set_reveal_child(False)
+        self.settings_shell_revealer.set_child(settings_shell)
 
         center_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         center_box.set_hexpand(True)
         center_box.append(self.content_stack)
-        center_box.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
-        center_box.append(self.settings_revealer)
+        center_box.append(self.settings_shell_revealer)
 
         sidebar = self.build_sidebar()
         self.sidebar_revealer = Gtk.Revealer(
@@ -1070,9 +1077,10 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         )
 
     def on_toggle_settings_clicked(self, *_args) -> None:
-        reveal = not self.settings_revealer.get_reveal_child()
+        reveal = not self.settings_shell_revealer.get_reveal_child()
         self.rebuild_settings_panel()
         self.settings_revealer.set_reveal_child(reveal)
+        self.settings_shell_revealer.set_reveal_child(reveal)
 
     def commands_from_editor(self, service_id: str) -> list[str]:
         text_view = self.settings_row_inputs[service_id]
