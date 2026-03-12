@@ -280,35 +280,27 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.settings_revealer = Gtk.Revealer(
             transition_type=Gtk.RevealerTransitionType.SLIDE_LEFT
         )
-        self.settings_revealer.set_reveal_child(False)
+        self.settings_revealer.set_reveal_child(True)
         self.settings_revealer.set_child(self.build_settings_panel())
-        settings_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        settings_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
-        settings_shell.append(self.settings_revealer)
-        self.settings_shell_revealer = Gtk.Revealer(
-            transition_type=Gtk.RevealerTransitionType.SLIDE_LEFT
-        )
-        self.settings_shell_revealer.set_reveal_child(False)
-        self.settings_shell_revealer.set_child(settings_shell)
+        self.settings_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self.settings_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
+        self.settings_shell.append(self.settings_revealer)
+        self.settings_shell.set_visible(False)
 
         center_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         center_box.set_hexpand(True)
         center_box.append(self.content_stack)
-        center_box.append(self.settings_shell_revealer)
+        center_box.append(self.settings_shell)
 
         sidebar = self.build_sidebar()
-        self.sidebar_revealer = Gtk.Revealer(
-            transition_type=Gtk.RevealerTransitionType.SLIDE_LEFT
-        )
-        self.sidebar_revealer.set_reveal_child(True)
-        sidebar_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        sidebar_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
-        sidebar_shell.append(sidebar)
-        self.sidebar_revealer.set_child(sidebar_shell)
+        self.sidebar_shell = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self.sidebar_shell.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
+        self.sidebar_shell.append(sidebar)
+        self.sidebar_shell.set_visible(True)
 
         root_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         root_content.append(center_box)
-        root_content.append(self.sidebar_revealer)
+        root_content.append(self.sidebar_shell)
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(header)
@@ -1066,7 +1058,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.webdev_revealer.set_reveal_child(not self.webdev_revealer.get_reveal_child())
 
     def on_toggle_sidebar_clicked(self, *_args) -> None:
-        self.sidebar_revealer.set_reveal_child(not self.sidebar_revealer.get_reveal_child())
+        self.sidebar_shell.set_visible(not self.sidebar_shell.get_visible())
 
     def on_toggle_category_clicked(self, _button, category_id: str) -> None:
         revealer = self.category_revealers[category_id]
@@ -1077,10 +1069,10 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         )
 
     def on_toggle_settings_clicked(self, *_args) -> None:
-        reveal = not self.settings_shell_revealer.get_reveal_child()
+        reveal = not self.settings_shell.get_visible()
         self.rebuild_settings_panel()
         self.settings_revealer.set_reveal_child(reveal)
-        self.settings_shell_revealer.set_reveal_child(reveal)
+        self.settings_shell.set_visible(reveal)
 
     def commands_from_editor(self, service_id: str) -> list[str]:
         text_view = self.settings_row_inputs[service_id]
