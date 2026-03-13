@@ -16,6 +16,13 @@ A lightweight GTK4 + VTE terminal application that uses Adwaita styling and lets
 python3 /var/home/poppolouse/Desktop/code/feterminal/feterminal.py
 ```
 
+macOS with Homebrew:
+
+```bash
+brew install gtk4 libadwaita pygobject3 vte3 python@3.13
+/opt/homebrew/bin/python3.13 ./feterminal.py
+```
+
 You can also point it at a project file directly:
 
 ```bash
@@ -77,6 +84,8 @@ The footer shows:
 ## File association
 
 `feterminal` registers the `.feterminal` extension as `application/x-feterminal-project`, so project files can be opened directly from the desktop environment.
+
+On macOS, the Linux desktop entry and MIME registration files are informational only unless you package the app separately.
 
 ## Default shortcuts
 

@@ -3,7 +3,6 @@
 import json
 import os
 import re
-import shutil
 import shlex
 import signal
 import subprocess
@@ -14,6 +13,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import gi
+from platform_support import build_service_spawn_argv
 
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
@@ -37,7 +37,7 @@ SERVICE_LOG_DIR_NAME = ".feterminal-logs"
 ERROR_PATTERN = re.compile(r"(error|exception|traceback|fatal|failed)", re.IGNORECASE)
 DEBUG_PATTERN = re.compile(r"(debug|trace|verbose|dbg)", re.IGNORECASE)
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
-SCRIPT_BIN = shutil.which("script") or "/home/linuxbrew/.linuxbrew/bin/script"
+BACKSPACE_PAIR_PATTERN = re.compile(r".\x08", re.DOTALL)
 ERROR_EVENT_START_PATTERN = re.compile(
     r"(unhandled exception|exception in asgi application|traceback \(most recent call last\):|^error[:\s]|^fatal[:\s]|^failed[:\s])",
     re.IGNORECASE,
@@ -171,14 +171,21 @@ def build_postgres_commands(config: dict) -> list[str]:
     container = str(config.get("container", DEFAULT_POSTGRES_CONTAINER)).strip() or DEFAULT_POSTGRES_CONTAINER
     user = str(config.get("user", "postgres")).strip() or "postgres"
     password = str(config.get("password", "")).strip()
+    host = str(config.get("host", DEFAULT_POSTGRES_HOST)).strip() or DEFAULT_POSTGRES_HOST
+    port = int(config.get("port", DEFAULT_POSTGRES_PORT))
+    helper_path = APP_DIR / "scripts" / "open-postgres-console.sh"
     command = [
-        "./scripts/open-postgres-console.sh",
+        shlex.quote(str(helper_path)),
         "--container",
         shlex.quote(container),
         "--user",
         shlex.quote(user),
         "--database",
         shlex.quote(database),
+        "--host",
+        shlex.quote(host),
+        "--port",
+        shlex.quote(str(port)),
     ]
     if password:
         command.extend(["--password", shlex.quote(password)])
@@ -230,7 +237,12 @@ def normalize_test_entries(value) -> list[dict]:
 
 
 def strip_ansi_sequences(value: str) -> str:
-    return ANSI_ESCAPE_PATTERN.sub("", value)
+    value = ANSI_ESCAPE_PATTERN.sub("", value)
+    previous = None
+    while previous != value:
+        previous = value
+        value = BACKSPACE_PAIR_PATTERN.sub("", value)
+    return value
 
 
 def resolve_project_file(
@@ -267,7 +279,7 @@ class ShortcutPreferencesWindow(Adw.PreferencesWindow):
         page = Adw.PreferencesPage()
         shortcut_group = Adw.PreferencesGroup(
             title="Keyboard Shortcuts",
-            description="Use GTK accelerator syntax, for example <Ctrl><Shift>c.",
+            description="Use GTK accelerator syntax, for example &lt;Ctrl&gt;&lt;Shift&gt;c.",
         )
         page.add(shortcut_group)
 
@@ -1432,15 +1444,11 @@ class FeTerminalWindow(Adw.ApplicationWindow):
     def commands_script(self, service_id: str) -> str:
         return "\n".join(self.commands_for_service(service_id))
 
-    def wrapped_commands_script(self, service_id: str) -> str:
-        log_path = shlex.quote(str(self.service_log_path(service_id)))
-        commands = self.commands_script(service_id)
-        bash_command = shlex.quote(f"bash -lc {shlex.quote(commands)}")
-        return (
-            f"mkdir -p {shlex.quote(str(self.service_log_directory()))}\n"
-            f": > {log_path}\n"
-            f"exec {shlex.quote(SCRIPT_BIN)} -qef -c {bash_command} {log_path}"
-        )
+    def service_spawn_argv(self, service_id: str) -> list[str]:
+        log_path = self.service_log_path(service_id)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("", encoding="utf-8")
+        return build_service_spawn_argv(self.commands_script(service_id), log_path)
 
     def action_copy(self, *_args) -> None:
         terminal = self.current_terminal()
@@ -1648,7 +1656,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         _ok, child_pid = terminal.spawn_sync(
             Vte.PtyFlags.DEFAULT,
             self.service_working_directory(service_id),
-            ["/bin/bash", "-lc", self.wrapped_commands_script(service_id)],
+            self.service_spawn_argv(service_id),
             None,
             GLib.SpawnFlags.DEFAULT,
             None,
