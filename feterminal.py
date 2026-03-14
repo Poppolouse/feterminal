@@ -371,6 +371,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         self.sidebar_visible = True
         self.settings_visible = False
         self.bootstrap_files = []
+        self.ai_footer_buttons = {}
 
         self.status_label = Gtk.Label(
             label="Ready",
@@ -475,12 +476,42 @@ class FeTerminalWindow(Adw.ApplicationWindow):
         outer_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         outer_box.append(root_content)
         outer_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
-        status_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        status_bar.append(self.status_label)
-        status_bar.append(Gtk.Box(hexpand=True))
-        status_bar.append(self.git_status_label)
-        status_bar.append(self.github_avatar_image)
-        status_bar.append(self.github_user_label)
+        status_bar = Gtk.CenterBox(orientation=Gtk.Orientation.HORIZONTAL)
+
+        left_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        left_box.append(self.status_label)
+        status_bar.set_start_widget(left_box)
+
+        ai_switcher = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+        ai_switcher.set_margin_top(3)
+        ai_switcher.set_margin_bottom(3)
+        for tool_name in AI_TOOL_NAMES:
+            btn = Gtk.Button()
+            btn.add_css_class("flat")
+            btn_inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            icon_path = AI_ICON_FILES[tool_name]
+            if icon_path.exists():
+                img = Gtk.Image.new_from_file(str(icon_path))
+                img.set_pixel_size(14)
+                btn_inner.append(img)
+            else:
+                btn_inner.append(Gtk.Image.new_from_icon_name("applications-engineering-symbolic"))
+            lbl = Gtk.Label(label=AI_LABELS[tool_name])
+            lbl.add_css_class("caption")
+            btn_inner.append(lbl)
+            btn.set_child(btn_inner)
+            btn.set_tooltip_text(f"Switch to {AI_LABELS[tool_name]} console")
+            btn.connect("clicked", self.on_ai_footer_button_clicked, tool_name)
+            ai_switcher.append(btn)
+            self.ai_footer_buttons[tool_name] = btn
+        status_bar.set_center_widget(ai_switcher)
+
+        right_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        right_box.append(self.git_status_label)
+        right_box.append(self.github_avatar_image)
+        right_box.append(self.github_user_label)
+        status_bar.set_end_widget(right_box)
+
         outer_box.append(status_bar)
         toolbar_view.set_content(outer_box)
         self.set_content(toolbar_view)
@@ -1122,7 +1153,7 @@ class FeTerminalWindow(Adw.ApplicationWindow):
                 "printf '  \\033[1;37mSettings\\033[0m   Use the Webdev gear button to edit commands\\n'",
                 "printf '  \\033[1;37mProject file\\033[0m .feterminal loads project-specific commands\\n\\n'",
                 "printf '  \\033[38;5;117mGitHub\\033[0m     https://github.com/Poppolouse/feterminal\\n'",
-                "printf '  \\033[38;5;117mRelease\\033[0m    v0.3.0\\n\\n'",
+                "printf '  \\033[38;5;117mRelease\\033[0m    v0.4.0\\n\\n'",
             ]
         )
         return "\n".join(lines) + "\n"
@@ -1431,6 +1462,18 @@ class FeTerminalWindow(Adw.ApplicationWindow):
                     break
         else:
             self.terminal_listbox.unselect_all()
+        self._update_ai_footer_buttons()
+
+    def _update_ai_footer_buttons(self) -> None:
+        for tool_name, btn in self.ai_footer_buttons.items():
+            service_id = f"ai:{tool_name}"
+            is_active = self.active_page_name == self.service_page_name(service_id)
+            btn.remove_css_class("suggested-action")
+            btn.remove_css_class("flat")
+            if is_active:
+                btn.add_css_class("suggested-action")
+            else:
+                btn.add_css_class("flat")
 
     def iter_listbox_rows(self, listbox: Gtk.ListBox):
         row = listbox.get_first_child()
@@ -1587,6 +1630,15 @@ class FeTerminalWindow(Adw.ApplicationWindow):
             return
         self.webdev_view_mode = mode
         self.rebuild_webdev_sidebar()
+
+    def on_ai_footer_button_clicked(self, _button, tool_name: str) -> None:
+        service_id = f"ai:{tool_name}"
+        session = self.service_sessions.get(service_id)
+        if session is None:
+            self.set_status(f"{AI_LABELS[tool_name]} is not running — press Start in the sidebar first")
+            return
+        self.select_page(session["page_name"])
+        self.set_status(f"Switched to {AI_LABELS[tool_name]}")
 
     def on_toggle_sidebar_clicked(self, *_args) -> None:
         self.sidebar_visible = not self.sidebar_visible
